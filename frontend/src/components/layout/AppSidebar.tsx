@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, PieChart, LineChart, Activity, X } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, PieChart, LineChart, Activity, X } from 'lucide-react';
 import { Logo } from '../common/Logo';
 
 interface AppSidebarProps {
@@ -16,6 +16,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
       icon: LayoutDashboard,
       phase: 1,
       badge: 'Active',
+    },
+    {
+      name: 'Market Data Feed',
+      path: '/market-data',
+      icon: TrendingUp,
+      phase: 2,
+      badge: 'Live Feed',
     },
     {
       name: 'Portfolio Engine',

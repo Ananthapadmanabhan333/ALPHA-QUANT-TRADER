@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: Literal["json", "text"] = "json"
 
+    # Market Data Subsystem Configuration (Binance Spot Public)
+    BINANCE_REST_BASE_URL: str = "https://api.binance.com"
+    BINANCE_WS_BASE_URL: str = "wss://stream.binance.com:9443/ws"
+    DEFAULT_SYMBOL: str = "BTCUSDT"
+    DEFAULT_INTERVAL: str = "1m"
+    MARKET_DATA_RATE_LIMIT_PER_MINUTE: int = 1200
+    MARKET_DATA_WS_INITIAL_BACKOFF_SECONDS: float = 1.0
+    MARKET_DATA_WS_MAX_BACKOFF_SECONDS: float = 60.0
+
 
 @lru_cache()
 def get_settings() -> Settings:

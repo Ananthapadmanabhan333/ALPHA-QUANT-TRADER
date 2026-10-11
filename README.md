@@ -1,6 +1,6 @@
 # ALPHA Quant — Institutional Trading Platform
 
-[![Phase](https://img.shields.io/badge/Phase-1%3A%20Foundation-gold.svg)](#)
+[![Phase](https://img.shields.io/badge/Phase-2%3A%20Market%20Data-gold.svg)](#)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-emerald.svg)](#)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](#)
@@ -10,17 +10,12 @@
 
 ---
 
-## 🏛️ Phase 1: Foundation Overview
+## 🏛️ Platform Architecture Overview
 
-**ALPHA Quant** is an enterprise-scale quantitative intelligence, algorithmic factor modeling, and trading execution platform designed for institutional workflows. 
+**ALPHA Quant** is an enterprise-scale quantitative intelligence, algorithmic factor modeling, and trading execution platform designed for institutional workflows.
 
-**Phase 1** establishes the mission-critical foundation:
-- Robust, reproducible **monorepo architecture**.
-- Production-grade **FastAPI backend** with application factory, lifespan management, structured JSON logging, central RFC-compliant exception handling, and versioned `/api/v1` routing.
-- **SQLAlchemy 2.x async engine** paired with **Alembic migration versioning** targeted at PostgreSQL and TimescaleDB hypertables.
-- **Service health checks**, readiness probes, persistent volume storage, and graceful shutdown lifecycle hooks.
-- **Cinematic React + Vite frontend** operating in **TypeScript strict mode**, featuring Tailwind CSS, institutional black-and-gold styling, basic routing, and honest empty states.
-- **Strict Zero-Synthetic Data Policy**: No fabricated trading metrics, no mocked profit tickers, and no fake live endpoints.
+- **Phase 1 (Foundation)**: Monorepo architecture, FastAPI application factory, lifespan management, structured JSON logging, central RFC-compliant exception handling, TimescaleDB / PostgreSQL persistence, Alembic migrations, and React strict mode shell.
+- **Phase 2 (Market Data Subsystem)**: Binance Spot public market data adapter, historical REST OHLCV ingestion (1m, 5m, 15m), live WebSocket streaming with automatic reconnects and exponential backoff jitter, strict price/volume/timestamp integrity validation, separate exchange and ingestion UTC timestamps, open vs. finalized candle distinction, database constraints preventing duplicates, sequence gap detection, rate-limited REST backfills, restart recovery, and live telemetry endpoints.
 
 ---
 
@@ -38,9 +33,12 @@ Alpha Quant/
 │   │   │   ├── v1/
 │   │   │   │   ├── endpoints/
 │   │   │   │   │   ├── health.py        # /api/v1/health & /readiness
-│   │   │   │   │   └── system.py        # /api/v1/system/status & audit-logs
+│   │   │   │   │   ├── system.py        # /api/v1/system/status & audit-logs
+│   │   │   │   │   └── market.py        # /api/v1/market/candles, /status, /backfill
 │   │   │   │   └── router.py            # Central v1 routing table
 │   │   │   └── deps.py                  # Database session dependency injection
+│   │   ├── cli/
+│   │   │   └── ingest.py                # CLI runner entrypoint
 │   │   ├── core/
 │   │   │   ├── config.py                # Pydantic Settings & environment validation
 │   │   │   ├── exceptions.py            # Central domain exceptions
@@ -49,15 +47,30 @@ Alpha Quant/
 │   │   ├── db/
 │   │   │   ├── base.py                  # SQLAlchemy 2.x DeclarativeBase & Mixins
 │   │   │   └── session.py               # Async engine, sessionmaker & health checks
+│   │   ├── market/
+│   │   │   ├── backoff.py               # Exponential backoff with full jitter
+│   │   │   ├── cli.py                   # Ingestion CLI implementation
+│   │   │   ├── constants.py             # Supported intervals (1m, 5m, 15m) & symbol helpers
+│   │   │   ├── exceptions.py            # Market data domain exceptions
+│   │   │   ├── models.py                # Re-export of MarketCandle
+│   │   │   ├── rate_limiter.py          # Sliding window 1200 weight/min REST rate limiter
+│   │   │   ├── rest_adapter.py          # Binance Spot public REST client
+│   │   │   ├── schemas.py               # Pydantic validation schemas
+│   │   │   ├── service.py               # Upsert, gap detection, backfill & restart recovery
+│   │   │   ├── tracker.py               # In-memory metrics & feed status telemetry
+│   │   │   ├── validator.py             # OHLCV, sequence & gap integrity validator
+│   │   │   └── ws_adapter.py            # Public WebSocket client with auto-reconnect
 │   │   ├── models/
 │   │   │   ├── base.py                  # Model registry
-│   │   │   └── system.py                # SystemAuditLog database model
+│   │   │   ├── market.py                # TimescaleDB MarketCandle model
+│   │   │   └── system.py                # SystemAuditLog model
 │   │   ├── schemas/
-│   │   │   └── health.py                # Pydantic validation schemas
+│   │   │   └── health.py                # Health & readiness validation schemas
 │   │   └── main.py                      # Application factory & lifespan manager
 │   ├── alembic/
 │   │   ├── versions/
-│   │   │   └── 0001_initial_schema.py   # Baseline schema migration
+│   │   │   ├── 0001_initial_schema.py   # Baseline system audit schema
+│   │   │   └── 0002_market_candles_schema.py # TimescaleDB hypertable candles schema
 │   │   ├── env.py                       # Alembic migration runner
 │   │   └── script.py.mako
 │   ├── tests/
@@ -66,6 +79,11 @@ Alpha Quant/
 │   │   ├── test_db.py                   # Live connection probe & CRUD tests
 │   │   ├── test_exceptions.py           # Domain exception & 422 validation tests
 │   │   ├── test_health.py               # Liveness & readiness probe tests
+│   │   ├── test_market_api.py           # Market REST API endpoints tests
+│   │   ├── test_market_rest.py          # Deterministic REST mock tests
+│   │   ├── test_market_service_db.py    # Idempotent upsert & gap tests
+│   │   ├── test_market_validator.py     # OHLCV integrity & sequence tests
+│   │   ├── test_market_ws.py            # WebSocket parsing & backoff tests
 │   │   └── test_system.py               # Status diagnostics & honest empty state tests
 │   ├── alembic.ini                      # Migration configuration
 │   ├── Dockerfile                       # Multi-stage production container spec
@@ -87,6 +105,7 @@ Alpha Quant/
     │   │       └── AppShell.tsx         # Master layout container
     │   ├── pages/
     │   │   ├── DashboardPage.tsx        # System overview & infrastructure status
+    │   │   ├── MarketDataPage.tsx       # Live market feed & historical candles explorer
     │   │   ├── PortfolioPage.tsx        # Portfolio empty state (Phase 2 preview)
     │   │   ├── StrategiesPage.tsx       # Strategies empty state (Phase 3 preview)
     │   │   ├── SystemHealthPage.tsx     # Real-time health diagnostic dashboard
@@ -95,7 +114,7 @@ Alpha Quant/
     │   │   └── api.ts                   # Typed API service client
     │   ├── types/
     │   │   └── index.ts                 # Strict TypeScript interface contracts
-    │   ├── App.tsx                      # Client router
+    │   ├── App.tsx                      # Client router with /market-data
     │   ├── index.css                    # Tailwind directives and custom scrollbars
     │   └── main.tsx                     # React DOM entry
     ├── Dockerfile                       # Production Nginx container
@@ -120,69 +139,60 @@ Alpha Quant/
 
 ### 1. Environment Configuration
 
-Copy the example configuration to create your local `.env`:
 ```powershell
 Copy-Item .env.example .env
 ```
 *(The `.gitignore` strictly protects `.env` from accidental commits).*
 
-### 2. Infrastructure via Docker Compose (Recommended)
+### 2. Infrastructure via Docker Compose
 
-Start the persistent TimescaleDB database container:
 ```powershell
 docker-compose up -d timescaledb
 ```
 
-To run the complete stack (TimescaleDB + Backend + Frontend):
-```powershell
-docker-compose up --build -d
-```
+### 3. Backend Setup & Migrations
 
-### 3. Backend Setup & Local Execution
-
-Create the Python virtual environment and install pinned dependencies:
 ```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-```
-
-#### Run Database Migrations
-Apply Alembic migrations to update the database to the head revision:
-```powershell
 .venv\Scripts\alembic upgrade head
 ```
 
 #### Launch Backend Server
-Start the FastAPI server via Uvicorn:
 ```powershell
 .venv\Scripts\uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-- Interactive Swagger Documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Root Health Probe: [http://localhost:8000/health](http://localhost:8000/health)
-- Root Readiness Probe: [http://localhost:8000/ready](http://localhost:8000/ready)
-- Versioned System Status: [http://localhost:8000/api/v1/system/status](http://localhost:8000/api/v1/system/status)
 
-### 4. Frontend Setup & Local Execution
+- Interactive OpenAPI Swagger Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- Root Health: [http://localhost:8000/health](http://localhost:8000/health)
+- Market Candles: [http://localhost:8000/api/v1/market/candles?symbol=BTCUSDT&interval=1m](http://localhost:8000/api/v1/market/candles?symbol=BTCUSDT&interval=1m)
+- Market Feed Status: [http://localhost:8000/api/v1/market/status?symbol=BTCUSDT&interval=1m](http://localhost:8000/api/v1/market/status?symbol=BTCUSDT&interval=1m)
 
-Navigate to the frontend directory and install dependencies:
+---
+
+## 📈 Market Data Ingestion CLI
+
+ALPHA Quant provides a dedicated CLI command to download real public historical OHLCV candles from Binance Spot with zero API keys:
+
 ```powershell
-cd frontend
-npm install
-```
+cd backend
+# Download historical 1m candles for BTC/USDT over a specified date range:
+.venv\Scripts\python -m app.market.cli --symbol BTCUSDT --interval 1m --start 2026-10-10 --end 2026-10-11
 
-#### Launch Vite Development Server
-```powershell
-npm run dev
+# Download 5m candles and immediately start live WebSocket streaming:
+.venv\Scripts\python -m app.market.cli --symbol BTCUSDT --interval 5m --start 2026-10-01 --stream
+
+# Ingestion command alias:
+.venv\Scripts\python -m app.cli.ingest --symbol BTCUSDT --interval 15m --start 2026-10-01
 ```
-The application shell will be accessible at: [http://localhost:5173](http://localhost:5173)
 
 ---
 
 ## 🧪 Verification & Testing Commands
 
 ### Backend Automated Test Suite
-Run all unit, configuration, exception, and API integration tests:
+Run all 42 automated tests (unit, integration, REST mock, WebSocket mock, validator, and DB upsert tests):
 ```powershell
 cd backend
 .venv\Scripts\pytest
@@ -208,24 +218,23 @@ npm run build
 
 | Method | Path | Summary | Description |
 |---|---|---|---|
-| `GET` | `/` | Root Information | Returns service name, version, status, and API routes. |
-| `GET` | `/health` | Root Liveness Probe | Confirms worker process responsiveness (200 OK). |
-| `GET` | `/ready` | Root Readiness Probe | Verifies live database pool connectivity (`SELECT 1`). |
-| `GET` | `/api/v1/health` | API v1 Liveness | Versioned liveness check. |
-| `GET` | `/api/v1/health/readiness` | API v1 Readiness | Versioned database readiness verification. |
+| `GET` | `/health` | Root Liveness | Asserts worker process is responsive (200 OK). |
+| `GET` | `/ready` | Root Readiness | Verifies live database pool connectivity (`SELECT 1`). |
+| `GET` | `/api/v1/health` | API v1 Liveness | Versioned liveness probe. |
 | `GET` | `/api/v1/system/status` | System Status | Comprehensive uptime, dialect, and database latency. |
-| `GET` | `/api/v1/system/audit-logs` | System Audit Trail | Honest audit logs (empty array until real events logged). |
+| `GET` | `/api/v1/market/candles` | Market Candles | Queries stored OHLCV candles with interval and time filters. |
+| `GET` | `/api/v1/market/status` | Feed Health | Returns live WebSocket feed state, message rates, and gaps. |
+| `POST` | `/api/v1/market/backfill` | REST Backfill | Triggers rate-limited historical gap backfill. |
 
 ---
 
-## 🛡️ Phase 1 Acceptance Criteria Checklist
+## 🛡️ Phase 2 Acceptance Criteria Checklist
 
-- [x] **Backend starts**: FastAPI application factory initializes cleanly with lifespan management.
-- [x] **Frontend starts**: React 18 + Vite development server serves the branded shell on `:5173`.
-- [x] **Database becomes healthy**: Connection pooling and async probe verify query readiness.
-- [x] **Database migrations apply successfully**: Alembic revision `0001_initial_schema` creates tables with indexes.
-- [x] **Health endpoints work**: `/health`, `/ready`, `/api/v1/health`, and `/api/v1/system/status` operational.
-- [x] **Frontend compiles with TypeScript strict mode**: `tsc --noEmit` exits with 0 errors.
-- [x] **Tests run from documented commands**: `pytest` executes 16 automated test suites (100% pass rate).
-- [x] **No secrets are committed**: Secrets strictly isolated in `.env` (ignored by git).
-- [x] **Zero Synthetic Data Policy**: Honest empty states displayed until live feeds connect.
+- [x] **Real public historical candles can be downloaded**: Verified directly against Binance Spot REST endpoint.
+- [x] **Live public market updates can be ingested**: Binance Spot WebSocket stream with automatic reconnects and exponential backoff with jitter.
+- [x] **Candle data persists across restarts**: TimescaleDB `market_candles` schema stores candles with time-series indexes.
+- [x] **Duplicate candles are rejected or safely ignored**: Unique constraint `(symbol, interval, open_time)` and idempotent upsert logic.
+- [x] **Missing data is detected and reported**: Gap detection algorithm computes exact missing ranges without synthetic fabrication.
+- [x] **Health endpoints reflect actual feed status**: `/api/v1/market/status` reports real-time feed states and diagnostics.
+- [x] **No exchange API keys are required**: 100% public endpoints.
+- [x] **All relevant tests pass**: 42 automated tests pass with 100% success rate.

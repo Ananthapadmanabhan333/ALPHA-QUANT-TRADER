@@ -1,4 +1,11 @@
-import { HealthResponse, ReadinessResponse, SystemInfo, SystemAuditLog } from '../types';
+import {
+  HealthResponse,
+  ReadinessResponse,
+  SystemInfo,
+  SystemAuditLog,
+  CandlesListResponse,
+  MarketStatusResponse,
+} from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -29,4 +36,29 @@ export async function fetchSystemStatus(): Promise<SystemInfo> {
 export async function fetchSystemAuditLogs(limit: number = 20): Promise<SystemAuditLog[]> {
   const res = await fetch(`${API_BASE_URL}/api/v1/system/audit-logs?limit=${limit}`);
   return handleResponse<SystemAuditLog[]>(res);
+}
+
+export async function fetchCandles(
+  symbol: string = 'BTCUSDT',
+  interval: string = '1m',
+  limit: number = 50,
+  onlyClosed: boolean = true,
+): Promise<CandlesListResponse> {
+  const query = new URLSearchParams({
+    symbol,
+    interval,
+    limit: limit.toString(),
+    only_closed: onlyClosed.toString(),
+  });
+  const res = await fetch(`${API_BASE_URL}/api/v1/market/candles?${query.toString()}`);
+  return handleResponse<CandlesListResponse>(res);
+}
+
+export async function fetchMarketStatus(
+  symbol: string = 'BTCUSDT',
+  interval: string = '1m',
+): Promise<MarketStatusResponse> {
+  const query = new URLSearchParams({ symbol, interval });
+  const res = await fetch(`${API_BASE_URL}/api/v1/market/status?${query.toString()}`);
+  return handleResponse<MarketStatusResponse>(res);
 }
