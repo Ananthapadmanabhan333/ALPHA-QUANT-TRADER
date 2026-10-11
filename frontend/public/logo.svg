@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBF0D3" />
+      <stop offset="35%" stop-color="#D4AF37" />
+      <stop offset="70%" stop-color="#AA771C" />
+      <stop offset="100%" stop-color="#805A12" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#181822" />
+      <stop offset="100%" stop-color="#08080C" />
+    </linearGradient>
+    <linearGradient id="borderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D4AF37" />
+      <stop offset="50%" stop-color="#3A3A4A" />
+      <stop offset="100%" stop-color="#AA771C" />
+    </linearGradient>
+  </defs>
+
+  <!-- Base Badge / Frame -->
+  <polygon points="50,4 92,26 92,74 50,96 8,74 8,26" fill="url(#bgGrad)" stroke="url(#borderGrad)" stroke-width="2.5" />
+  
+  <!-- Subtle Internal Geometry -->
+  <polygon points="50,12 84,30 84,70 50,88 16,70 16,30" fill="none" stroke="rgba(212, 175, 55, 0.2)" stroke-width="1" stroke-dasharray="2,3" />
+
+  <!-- The Alpha 'A' / Lambda Core Glyph -->
+  <path d="M 50,22 L 72,74 L 61,74 L 56,60 L 44,60 L 39,74 L 28,74 Z M 50,38 L 46.5,52 L 53.5,52 Z" fill="url(#goldGrad)" />
+  
+  <!-- Precision Quantum Focal Crosshair -->
+  <circle cx="50" cy="50" r="1.5" fill="#FBF0D3" />
+  <line x1="50" y1="16" x2="50" y2="20" stroke="url(#goldGrad)" stroke-width="1.5" />
+  <line x1="50" y1="80" x2="50" y2="84" stroke="url(#goldGrad)" stroke-width="1.5" />
+</svg>

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: alpha_quant_timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_secure_placeholder}
+      POSTGRES_DB: ${POSTGRES_DB:-alpha_quant}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-alpha_quant}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 15s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: alpha_quant_backend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - PROJECT_NAME=ALPHA Quant
+      - VERSION=1.0.0
+      - HOST=0.0.0.0
+      - PORT=8000
+      - POSTGRES_SERVER=timescaledb
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres_secure_placeholder}
+      - POSTGRES_DB=${POSTGRES_DB:-alpha_quant}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_placeholder}@timescaledb:5432/${POSTGRES_DB:-alpha_quant}
+      - DATABASE_SYNC_URL=postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_placeholder}@timescaledb:5432/${POSTGRES_DB:-alpha_quant}
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: alpha_quant_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    stop_grace_period: 5s
+
+volumes:
+  timescaledb_data:
+    driver: local
