@@ -15,12 +15,14 @@ import {
 import {
   PaperAccount,
   PaperOrder,
+  PaperFill,
   PaperOrderCreateRequest,
   RiskStatus,
 } from '../types';
 import {
   fetchPaperAccount,
   fetchPaperOrders,
+  fetchFills,
   submitPaperOrder,
   cancelPaperOrder,
   fetchRiskStatus,
@@ -31,6 +33,8 @@ import {
 export const PortfolioPage: React.FC = () => {
   const [account, setAccount] = useState<PaperAccount | null>(null);
   const [orders, setOrders] = useState<PaperOrder[]>([]);
+  const [fills, setFills] = useState<PaperFill[]>([]);
+  const [activeLedgerTab, setActiveLedgerTab] = useState<'orders' | 'fills'>('orders');
   const [risk, setRisk] = useState<RiskStatus | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -52,13 +56,15 @@ export const PortfolioPage: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [acc, orderList, riskStat] = await Promise.all([
+      const [acc, orderList, fillsList, riskStat] = await Promise.all([
         fetchPaperAccount().catch(() => null),
         fetchPaperOrders().catch(() => []),
+        fetchFills().catch(() => ({ total: 0, limit: 50, offset: 0, items: [] })),
         fetchRiskStatus().catch(() => null),
       ]);
       setAccount(acc);
       setOrders(orderList);
+      setFills(fillsList.items || []);
       setRisk(riskStat);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load paper broker data.');
@@ -487,74 +493,154 @@ export const PortfolioPage: React.FC = () => {
             )}
           </div>
 
-          {/* Orders Audit Trail */}
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-5 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary mb-3 flex items-center justify-between">
-              <span>Simulated Orders Audit Log ({orders.length})</span>
-            </h3>
-
-            {orders.length === 0 ? (
-              <p className="text-xs text-alpha-text-secondary py-4 text-center">
-                No simulated orders placed yet.
-              </p>
-            ) : (
-              <div className="overflow-x-auto max-h-80 overflow-y-auto">
-                <table className="w-full text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-alpha-border text-alpha-text-secondary">
-                      <th className="text-left pb-2">Time</th>
-                      <th className="text-left pb-2">Side</th>
-                      <th className="text-right pb-2">Qty</th>
-                      <th className="text-right pb-2">Fill Price</th>
-                      <th className="text-center pb-2">Status</th>
-                      <th className="text-right pb-2">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-alpha-border/40">
-                    {orders.map((o) => (
-                      <tr key={o.id} className="hover:bg-alpha-surface/50">
-                        <td className="py-2 text-alpha-text-secondary">
-                          {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                        </td>
-                        <td className="py-2">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            o.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                          }`}>
-                            {o.side} {o.order_type}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right text-alpha-text-secondary">{o.quantity.toFixed(4)}</td>
-                        <td className="py-2 text-right text-alpha-text-primary">
-                          {o.avg_fill_price ? `$${o.avg_fill_price.toFixed(2)}` : o.price ? `$${o.price.toFixed(2)}` : 'Market'}
-                        </td>
-                        <td className="py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            o.status === 'filled'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : o.status === 'open'
-                              ? 'bg-blue-500/20 text-blue-400'
-                              : o.status === 'rejected'
-                              ? 'bg-rose-500/20 text-rose-400'
-                              : 'bg-alpha-surface text-alpha-text-secondary'
-                          }`}>
-                            {o.status}
-                          </span>
-                        </td>
-                        <td className="py-2 text-right">
-                          {o.status === 'open' && (
-                            <button
-                              onClick={() => handleCancelOrder(o.id)}
-                              className="text-rose-400 hover:text-rose-300 text-[11px] underline"
-                            >
-                              Cancel
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Orders & Fills Ledger Card with Tabs */}
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-alpha-border pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveLedgerTab('orders')}
+                  className={`px-3 py-1 text-xs font-mono rounded font-semibold transition-colors ${
+                    activeLedgerTab === 'orders'
+                      ? 'bg-alpha-gold text-black'
+                      : 'bg-alpha-surface text-alpha-text-secondary hover:text-white'
+                  }`}
+                >
+                  Orders Log ({orders.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveLedgerTab('fills')}
+                  className={`px-3 py-1 text-xs font-mono rounded font-semibold transition-colors ${
+                    activeLedgerTab === 'fills'
+                      ? 'bg-alpha-gold text-black'
+                      : 'bg-alpha-surface text-alpha-text-secondary hover:text-white'
+                  }`}
+                >
+                  Execution Fills Ledger ({fills.length})
+                </button>
               </div>
+
+              <span className="text-[10px] font-mono text-alpha-text-muted">
+                {activeLedgerTab === 'orders' ? 'Simulated Lifecycle' : 'Audited Fills & Drag'}
+              </span>
+            </div>
+
+            {activeLedgerTab === 'orders' ? (
+              orders.length === 0 ? (
+                <p className="text-xs text-alpha-text-secondary py-4 text-center">
+                  No simulated orders placed yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-alpha-border text-alpha-text-secondary">
+                        <th className="text-left pb-2">Time</th>
+                        <th className="text-left pb-2">Side</th>
+                        <th className="text-right pb-2">Qty</th>
+                        <th className="text-right pb-2">Fill Price</th>
+                        <th className="text-center pb-2">Status</th>
+                        <th className="text-right pb-2">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-alpha-border/40">
+                      {orders.map((o) => (
+                        <tr key={o.id} className="hover:bg-alpha-surface/50">
+                          <td className="py-2 text-alpha-text-secondary">
+                            {new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td className="py-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              o.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {o.side} {o.order_type}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right text-alpha-text-secondary">{o.quantity.toFixed(4)}</td>
+                          <td className="py-2 text-right text-alpha-text-primary">
+                            {o.avg_fill_price ? `$${o.avg_fill_price.toFixed(2)}` : o.price ? `$${o.price.toFixed(2)}` : 'Market'}
+                          </td>
+                          <td className="py-2 text-center">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              o.status === 'filled'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : o.status === 'open'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : o.status === 'rejected'
+                                ? 'bg-rose-500/20 text-rose-400'
+                                : 'bg-alpha-surface text-alpha-text-secondary'
+                            }`}>
+                              {o.status}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right">
+                            {o.status === 'open' && (
+                              <button
+                                onClick={() => handleCancelOrder(o.id)}
+                                className="text-rose-400 hover:text-rose-300 text-[11px] underline"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            ) : (
+              fills.length === 0 ? (
+                <p className="text-xs text-alpha-text-secondary py-4 text-center">
+                  No simulated execution fills recorded yet.
+                </p>
+              ) : (
+                <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead>
+                      <tr className="border-b border-alpha-border text-alpha-text-secondary">
+                        <th className="text-left pb-2">Time (UTC)</th>
+                        <th className="text-left pb-2">Side</th>
+                        <th className="text-right pb-2">Fill Price</th>
+                        <th className="text-right pb-2">Qty</th>
+                        <th className="text-right pb-2">Notional</th>
+                        <th className="text-right pb-2">Fee</th>
+                        <th className="text-right pb-2">Slippage</th>
+                        <th className="text-right pb-2">Realized P&L</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-alpha-border/40">
+                      {fills.map((f) => (
+                        <tr key={f.id} className="hover:bg-alpha-surface/50">
+                          <td className="py-2 text-alpha-text-secondary">
+                            {new Date(f.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                          </td>
+                          <td className="py-2">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              f.side === 'buy' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}>
+                              {f.side}
+                            </span>
+                          </td>
+                          <td className="py-2 text-right text-alpha-text-primary">
+                            ${f.fill_price.toFixed(2)}
+                          </td>
+                          <td className="py-2 text-right text-alpha-text-secondary">{f.quantity.toFixed(4)}</td>
+                          <td className="py-2 text-right text-alpha-text-secondary">${f.gross_notional.toFixed(2)}</td>
+                          <td className="py-2 text-right text-alpha-gold">${f.fee.toFixed(2)}</td>
+                          <td className="py-2 text-right text-rose-300">${f.slippage_cost.toFixed(2)}</td>
+                          <td className={`py-2 text-right font-bold ${
+                            f.realized_pnl > 0 ? 'text-emerald-400' : f.realized_pnl < 0 ? 'text-rose-400' : 'text-alpha-text-secondary'
+                          }`}>
+                            ${f.realized_pnl.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
             )}
           </div>
         </div>
@@ -603,4 +689,6 @@ export const PortfolioPage: React.FC = () => {
     </div>
   );
 };
+
+export const PaperTradingPage = PortfolioPage;
 export default PortfolioPage;

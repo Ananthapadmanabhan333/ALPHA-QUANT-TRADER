@@ -18,9 +18,26 @@ import {
   PaperFill,
   RiskStatus,
   PaperOrderCreateRequest,
+  PaginatedResponse,
+  PaperTradingStartRequest,
+  PaperTradingStartResponse,
+  PaperTradingStopResponse,
+  PaperTradingStatus,
+  RiskResetRequest,
+  RiskResetResponse,
+  SystemEvent,
+  AsyncTaskResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+function getAuthHeaders(): HeadersInit {
+  const key = localStorage.getItem('alpha_admin_api_key') || 'alpha-admin-dev-key';
+  return {
+    'Content-Type': 'application/json',
+    'X-API-Key': key,
+  };
+}
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -198,7 +215,7 @@ export async function fetchRiskStatus(symbol: string = 'BTCUSDT'): Promise<RiskS
 export async function triggerEmergencyStop(reason: string): Promise<RiskStatus> {
   const res = await fetch(`${API_BASE_URL}/api/v1/paper/risk/emergency-stop`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ reason }),
   });
   return handleResponse<RiskStatus>(res);
@@ -210,13 +227,110 @@ export async function resumeEmergencyStop(
 ): Promise<RiskStatus> {
   const res = await fetch(`${API_BASE_URL}/api/v1/paper/risk/resume`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({
       confirmation,
       reset_consecutive_losses: resetConsecutiveLosses,
     }),
   });
   return handleResponse<RiskStatus>(res);
+}
+
+// ==========================================
+// Phase 6 & 7: Unified Portfolio, Fills, & Orchestration API
+// ==========================================
+
+export async function fetchPortfolio(symbol: string = 'BTCUSDT'): Promise<PaperAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/portfolio?symbol=${symbol}`);
+  return handleResponse<PaperAccount>(res);
+}
+
+export async function fetchOrdersPaginated(
+  status?: string,
+  symbol?: string,
+  side?: string,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<PaginatedResponse<PaperOrder>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  if (status) params.append('status', status);
+  if (symbol) params.append('symbol', symbol);
+  if (side) params.append('side', side);
+  const res = await fetch(`${API_BASE_URL}/api/v1/orders?${params.toString()}`);
+  return handleResponse<PaginatedResponse<PaperOrder>>(res);
+}
+
+export async function fetchFills(
+  symbol?: string,
+  side?: string,
+  orderId?: string,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<PaginatedResponse<PaperFill>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  if (symbol) params.append('symbol', symbol);
+  if (side) params.append('side', side);
+  if (orderId) params.append('order_id', orderId);
+  const res = await fetch(`${API_BASE_URL}/api/v1/fills?${params.toString()}`);
+  return handleResponse<PaginatedResponse<PaperFill>>(res);
+}
+
+export async function startPaperTrading(payload: PaperTradingStartRequest): Promise<PaperTradingStartResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper-trading/start`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<PaperTradingStartResponse>(res);
+}
+
+export async function stopPaperTrading(): Promise<PaperTradingStopResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper-trading/stop`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<PaperTradingStopResponse>(res);
+}
+
+export async function fetchPaperTradingStatus(): Promise<PaperTradingStatus> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper-trading/status`);
+  return handleResponse<PaperTradingStatus>(res);
+}
+
+export async function resetRiskLimits(payload: RiskResetRequest): Promise<RiskResetResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/risk/reset`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<RiskResetResponse>(res);
+}
+
+export async function fetchSystemEvents(
+  severity?: string,
+  eventType?: string,
+  limit: number = 50,
+  offset: number = 0,
+): Promise<PaginatedResponse<SystemEvent>> {
+  const params = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  if (severity) params.append('severity', severity);
+  if (eventType) params.append('event_type', eventType);
+  const res = await fetch(`${API_BASE_URL}/api/v1/events?${params.toString()}`);
+  return handleResponse<PaginatedResponse<SystemEvent>>(res);
+}
+
+export async function fetchAsyncTaskStatus(taskId: string): Promise<AsyncTaskResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/tasks/${taskId}`);
+  return handleResponse<AsyncTaskResponse>(res);
 }
 
 

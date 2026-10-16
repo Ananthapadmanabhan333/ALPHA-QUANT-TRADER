@@ -11,6 +11,8 @@ import {
   Sliders,
   DollarSign,
   AlertTriangle,
+  FileSpreadsheet,
+  FileJson,
 } from 'lucide-react';
 import {
   BacktestRun,
@@ -45,6 +47,61 @@ export const BacktestPage: React.FC = () => {
   const [takerFeeBps, setTakerFeeBps] = useState<number>(10.0);
   const [slippageBps, setSlippageBps] = useState<number>(5.0);
   const [includeStress, setIncludeStress] = useState<boolean>(true);
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
+
+  const handleExportCSV = () => {
+    if (!selectedRun || !selectedRun.trades) return;
+    const headers = [
+      'Trade_ID',
+      'Order_ID',
+      'Timestamp_UTC',
+      'Symbol',
+      'Side',
+      'Fill_Price',
+      'Quantity',
+      'Gross_Notional',
+      'Fee',
+      'Slippage',
+      'Net_Realized_PnL',
+    ];
+    const rows = selectedRun.trades.map((t) => [
+      t.trade_id,
+      t.order_id,
+      t.timestamp,
+      t.symbol,
+      t.side,
+      t.fill_price,
+      t.quantity,
+      t.gross_notional,
+      t.fee,
+      t.slippage_cost,
+      t.realized_net_pnl,
+    ]);
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `alpha_backtest_${selectedRun.id.substring(0, 8)}_trades.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportJSON = () => {
+    if (!selectedRun) return;
+    const dataStr =
+      'data:text/json;charset=utf-8,' +
+      encodeURIComponent(JSON.stringify(selectedRun, null, 2));
+    const link = document.createElement('a');
+    link.setAttribute('href', dataStr);
+    link.setAttribute('download', `alpha_backtest_${selectedRun.id.substring(0, 8)}_summary.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const loadData = async () => {
     setIsLoading(true);
@@ -86,6 +143,8 @@ export const BacktestPage: React.FC = () => {
       symbol,
       interval,
       initial_cash: initialCash,
+      start_time: startTime ? new Date(startTime).toISOString() : undefined,
+      end_time: endTime ? new Date(endTime).toISOString() : undefined,
       cost_assumptions: {
         maker_fee_bps: makerFeeBps,
         taker_fee_bps: takerFeeBps,
@@ -263,6 +322,31 @@ export const BacktestPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-alpha-text-secondary mb-1">
+                    Start Window (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full bg-alpha-surface border border-alpha-border rounded-lg px-2.5 py-1.5 text-xs text-alpha-text-primary focus:outline-none focus:border-alpha-gold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-alpha-text-secondary mb-1">
+                    End Window (Optional)
+                  </label>
+                  <input
+                    type="date"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full bg-alpha-surface border border-alpha-border rounded-lg px-2.5 py-1.5 text-xs text-alpha-text-primary focus:outline-none focus:border-alpha-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-alpha-text-secondary mb-1">
                     Taker Fee (bps)
                   </label>
                   <input
@@ -410,11 +494,33 @@ export const BacktestPage: React.FC = () => {
                       Dataset Fingerprint: {selectedRun.dataset_fingerprint.substring(0, 16)}... | Symbol: {selectedRun.symbol} ({selectedRun.interval})
                     </p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs text-alpha-text-secondary">Net Realized Equity</span>
-                    <p className="text-2xl font-mono font-bold text-alpha-text-primary">
-                      ${((selectedRun.metrics.final_equity as number) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
+                  <div className="flex flex-col sm:items-end gap-2">
+                    <div className="text-right">
+                      <span className="text-xs text-alpha-text-secondary">Net Realized Equity</span>
+                      <p className="text-2xl font-mono font-bold text-alpha-text-primary">
+                        ${((selectedRun.metrics.final_equity as number) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleExportCSV}
+                        title="Export trade ledger as CSV"
+                        className="px-2.5 py-1 rounded bg-alpha-surface border border-alpha-border hover:border-alpha-gold text-[11px] font-mono text-alpha-text-secondary hover:text-white transition-colors flex items-center gap-1.5"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Export CSV</span>
+                      </button>
+
+                      <button
+                        onClick={handleExportJSON}
+                        title="Export complete run parameters and metrics as JSON"
+                        className="px-2.5 py-1 rounded bg-alpha-surface border border-alpha-border hover:border-alpha-gold text-[11px] font-mono text-alpha-text-secondary hover:text-white transition-colors flex items-center gap-1.5"
+                      >
+                        <FileJson className="w-3.5 h-3.5 text-alpha-gold" />
+                        <span>Export JSON</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 

@@ -358,4 +358,95 @@ export interface PaperOrderCreateRequest {
   current_market_price?: number;
 }
 
+// ==========================================
+// Phase 6 & 7: Orchestration, Lifecycle & Events
+// ==========================================
+
+export interface PaginatedResponse<T> {
+  total: number;
+  limit: number;
+  offset: number;
+  items: T[];
+}
+
+export interface PaperTradingStartRequest {
+  strategy_id: string;
+  symbol?: string;
+  interval?: string;
+  poll_interval_seconds?: number;
+  order_size_pct?: number;
+  parameters?: Record<string, unknown>;
+}
+
+export interface PaperTradingStartResponse {
+  status: string;
+  strategy_id: string;
+  symbol: string;
+  interval: string;
+  poll_interval_seconds: number;
+  started_at: string;
+  message: string;
+}
+
+export interface PaperTradingStopResponse {
+  status: string;
+  stopped_at: string;
+  cycles_completed: number;
+  orders_submitted: number;
+  signals_evaluated: number;
+  message: string;
+}
+
+export interface PaperTradingStatus {
+  is_running: boolean;
+  strategy_id?: string | null;
+  symbol?: string | null;
+  interval?: string | null;
+  poll_interval_seconds?: number | null;
+  started_at?: string | null;
+  cycles_completed: number;
+  signals_evaluated: number;
+  orders_submitted: number;
+  last_cycle_at?: string | null;
+  last_error?: string | null;
+  lock_acquired: boolean;
+  task_active: boolean;
+}
+
+export interface RiskResetRequest {
+  confirmation_code: string;
+  reset_emergency_stop?: boolean;
+  reset_consecutive_losses?: boolean;
+  reset_daily_loss?: boolean;
+  reason: string;
+}
+
+export interface RiskResetResponse {
+  success: boolean;
+  message: string;
+  timestamp: string;
+  risk_state: Record<string, unknown>;
+}
+
+export interface SystemEvent {
+  id: string;
+  account_id: string;
+  event_type: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL' | string;
+  reason: string;
+  metadata_json?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface AsyncTaskResponse {
+  task_id: string;
+  task_type: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' | string;
+  created_at: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  result?: Record<string, unknown> | null;
+}
+
 

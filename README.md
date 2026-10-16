@@ -1,6 +1,6 @@
 # ALPHA Quant — Institutional Trading Platform
 
-[![Phase](https://img.shields.io/badge/Phase-6%3A%20API%20%26%20Orchestration-gold.svg)](#)
+[![Phase](https://img.shields.io/badge/Phase-7%3A%20Frontend%20%26%20Branding-gold.svg)](#)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-emerald.svg)](#)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](#)
@@ -20,6 +20,7 @@
 - **Phase 4 (Deterministic Historical Backtesting Engine)**: Event-driven historical simulation engine with chronological event loop. Strict next-bar Open execution model preventing look-ahead fill bias. Explicit cost separation (Gross P&L, Maker/Taker fees, adverse slippage penalty, Net P&L). Strict portfolio ledger invariants ($\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$, $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$). Liquidity participation constraints (capped at $10\%$ of bar volume). Comprehensive validation framework: chronological train/validation/untouched holdout splits, rolling walk-forward evaluation, 4-regime classification (Bullish, Bearish, Choppy, High Volatility), passive buy-and-hold benchmark, no-trade baseline, and multi-scenario cost/latency stress testing (2x/5x fees, 3x slippage, severe stress, delayed execution by 1 bar). High-precision analytics persisted in TimescaleDB/PostgreSQL (`backtest_runs` & `backtest_trades`) and exposed via REST APIs and an institutional React frontend.
 - **Phase 5 (Paper Execution & Central Risk Subsystem)**: Dedicated PaperBroker simulating spot execution without live trading capabilities. Strict pre-trade Central Risk Gate enforcing maximum order notional ($10,000), position concentration (10% of equity), aggregate exposure (80%), daily loss limits (2%), peak-to-trough drawdown limits (5%), consecutive loss streak halts, data-freshness guards (max 300s feed age), and spread/liquidity filters. Transactional atomicity for orders, fills, positions, and balance mutations with idempotent submissions (`client_order_id`). Emergency Stop kill switch with strict non-resetting restart recovery, operational ledger reconciliation, and institutional React control console (`/portfolio`).
 - **Phase 6 (API & Lifecycle Orchestration)**: Enterprise lifecycle manager coordinating the complete 9-stage quantitative pipeline: (1) market data health, (2) feature pipeline readiness, (3) strategy scheduling, (4) signal validation, (5) Central Risk Gate, (6) paper order submission, (7) fill processing, (8) portfolio updates, and (9) event persistence. Explicit task ownership preventing duplicate scheduler executions with HTTP 409 conflict detection. Asynchronous background task queue for long-running backtests and heavy jobs. Real-time WebSocket telemetry streaming (`/api/v1/ws/live`) with handshake snapshots, ping/pong heartbeats, and REST fallback (`/api/v1/live/fallback`). Mandatory multi-dependency operational readiness probes (`/ready` requires both healthy database and responsive market data feed). Administrative authentication and authorization protecting mutating operations (`ADMIN_API_KEY`), and unified paginated REST endpoints (`/portfolio`, `/orders`, `/fills`, `/events`, `/risk/status`, `/paper-trading/*`, `/risk/reset`).
+- **Phase 7 (Frontend & Branding)**: Institutional quantitative trading dashboard connected to the real FastAPI backend. Full brand identity applied: Product name `ALPHA`, full name `ALPHA Quant`, near-black background (`#0A0A0C`), restrained metallic gold accents (`#D4AF37`, `#FBF0D3`), compact financial tables, responsive layouts, and supplied hexagonal shield badge logo asset (`frontend/public/logo.svg`, `frontend/src/components/common/Logo.tsx`). Zero fabricated metrics or synthetic prices; honest empty and disconnected states. 8 canonical navigation pages implemented: (1) Overview, (2) Markets, (3) Strategies, (4) Backtesting, (5) Paper Trading, (6) Risk Management, (7) Experiments, (8) System Health.
 
 
 ---
@@ -445,5 +446,32 @@ npm run build
   - **108/108** automated unit, integration, and API tests pass in 13.33s.
   - Frontend TypeScript compiles in strict mode with 0 errors.
   - Frontend production build compiles in 1.95s.
+
+---
+
+## 🎨 Phase 7 Acceptance Criteria Checklist
+
+- [x] **Brand Identity & Aesthetics**:
+  - Product Name: **ALPHA**, Full Name: **ALPHA Quant**.
+  - Color Palette: Deep near-black canvas (`#0A0A0C`), elevated card surfaces (`#121216`), restrained metallic gold accents (`#D4AF37`, `#FBF0D3`).
+  - Supplied geometric hexagonal badge logo asset integrated and verified (`frontend/public/logo.svg`, `frontend/src/components/common/Logo.tsx`).
+  - Clear typography, compact financial tables, responsive mobile/desktop layouts.
+- [x] **Honest Telemetry & Non-Fabrication**:
+  - Zero synthetic profit numbers, simulated performance curves, or fake prices to populate empty screens.
+  - Honest empty, loading, error, and disconnected states across all views.
+- [x] **Complete Application Navigation (8 Canonical Pages)**:
+  - **1. Overview (`/` and `/overview`)**: Live BTC/USDT spot price ticker, feed freshness badge, simulated equity, Net P&L, peak-to-trough drawdown, exposure %, fee and slippage breakdown, recent strategy signals, risk events, and collector/backend health.
+  - **2. Markets (`/markets` and `/market-data`)**: Interactive SVG Candlestick chart, 1m/5m/15m interval toggle, technical feature overlays (SMA 20, SMA 100), signal markers (Buy/Sell triangles), historical bar selector (50/100/200/300), and missing-data/stale-feed warnings.
+  - **3. Strategies (`/strategies`)**: Strategy cards with version, descriptions, candidate hyperparameters, features used, persisted evaluation results, and paper trading start/stop controls with confirmation modals.
+  - **4. Backtesting (`/backtesting` and `/backtests`)**: Form inputs for strategy, dataset, date range, fee/slippage assumptions, and hyperparameters. Execution views for progress, equity curves, benchmark comparison, rolling walk-forward results, stress tests, trades ledger, and exportable CSV and JSON summaries.
+  - **5. Paper Trading (`/paper-trading` and `/portfolio`)**: Virtual USDT balances, open positions ledger, active and historical orders, execution fills ledger, realized and unrealized P&L, explicit fee and slippage deductions, and order entry/cancellation.
+  - **6. Risk Management (`/risk`)**: Institutional matrix of 11 pre-trade invariant checks, exposure gauge, drawdown meter, circuit-breaker kill switch (`POST /api/v1/paper/risk/emergency-stop`), and operator reset modal (`POST /api/v1/risk/reset` with `"CONFIRM_RESET"` token).
+  - **7. Experiments (`/experiments`)**: Reproducible experiment metadata, SHA-256 cryptographic dataset fingerprints, hyperparameters, and chronological signal decision logs.
+  - **8. System Health (`/system-health` and `/system`)**: Collector lag, WebSocket reconnection counts, TimescaleDB latency, API error rates, background worker status, and readiness probes (`/ready`).
+- [x] **Technical & Architectural Verification**:
+  - TypeScript strict mode enforced (`npm run typecheck` passes with 0 errors).
+  - Production build optimized (`npm run build` succeeds cleanly in <2s).
+  - All 108 backend tests passing.
+  - Zero live trading order execution routes or stored credentials.
 
 

@@ -1,44 +1,59 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Activity,
   Server,
   Database,
   RefreshCw,
-  Clock,
   Terminal,
   AlertTriangle,
-  Info,
+  Radio,
+  Zap,
 } from 'lucide-react';
 import {
   fetchHealth,
   fetchReadiness,
   fetchSystemStatus,
   fetchSystemAuditLogs,
+  fetchMarketStatus,
+  fetchPaperTradingStatus,
 } from '../services/api';
-import { HealthResponse, ReadinessResponse, SystemInfo, SystemAuditLog } from '../types';
+import {
+  HealthResponse,
+  ReadinessResponse,
+  SystemInfo,
+  SystemAuditLog,
+  MarketStatusResponse,
+  PaperTradingStatus,
+} from '../types';
 import { HealthBadge } from '../components/common/HealthBadge';
 
 export const SystemHealthPage: React.FC = () => {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [readiness, setReadiness] = useState<ReadinessResponse | null>(null);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [marketStatus, setMarketStatus] = useState<MarketStatusResponse | null>(null);
+  const [orchestratorStatus, setOrchestratorStatus] = useState<PaperTradingStatus | null>(null);
   const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const runDiagnostics = async () => {
+  const runDiagnostics = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [h, r, s, logs] = await Promise.all([
+      const [h, r, s, m, o, logs] = await Promise.all([
         fetchHealth().catch(() => null),
         fetchReadiness().catch(() => null),
         fetchSystemStatus().catch(() => null),
-        fetchSystemAuditLogs().catch(() => []),
+        fetchMarketStatus('BTCUSDT', '1m').catch(() => null),
+        fetchPaperTradingStatus().catch(() => null),
+        fetchSystemAuditLogs(30).catch(() => []),
       ]);
       setHealth(h);
       setReadiness(r);
       setSystemInfo(s);
+      setMarketStatus(m);
+      setOrchestratorStatus(o);
       setAuditLogs(logs);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Diagnostic probe failed';
@@ -46,39 +61,50 @@ export const SystemHealthPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     runDiagnostics();
-  }, []);
+    const intervalTimer = window.setInterval(runDiagnostics, 5000);
+    return () => clearInterval(intervalTimer);
+  }, [runDiagnostics]);
+
+  // Compute collector lag
+  const lastExchangeTime = marketStatus?.last_exchange_time ? new Date(marketStatus.last_exchange_time).getTime() : null;
+  const collectorLagSeconds = lastExchangeTime ? Math.max(0, Math.round((Date.now() - lastExchangeTime) / 1000)) : null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-alpha-text-primary flex items-center gap-3">
-            <Activity className="w-6 h-6 text-alpha-gold" />
-            <span>System Diagnostics & Health Probes</span>
-          </h1>
-          <p className="text-sm text-alpha-text-secondary mt-1">
-            Real-time verification of FastAPI application factory, database connection, and Alembic migrations.
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+              <Activity className="w-6 h-6 text-alpha-gold" />
+              <span>SYSTEM HEALTH & DIAGNOSTICS</span>
+            </h1>
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/10 text-alpha-gold border border-alpha-gold/30">
+              KUBERNETES READY
+            </span>
+          </div>
+          <p className="text-xs text-alpha-text-secondary mt-1 font-mono">
+            Collector Lag • Reconnect Counters • TimescaleDB Health • Lifecycle Worker Status
           </p>
         </div>
 
         <button
           onClick={runDiagnostics}
           disabled={loading}
-          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-mono font-medium rounded-lg bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30 hover:bg-alpha-gold/25 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono font-medium rounded-lg bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30 hover:bg-alpha-gold/25 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Run Probe</span>
+          <span>Run Probes</span>
         </button>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl border border-rose-900/60 bg-rose-950/30 flex items-start gap-3 text-rose-300 text-sm">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400 mt-0.5" />
+        <div className="p-4 rounded-xl border border-rose-900/60 bg-rose-950/30 flex items-start gap-3 text-rose-300 text-xs font-mono">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400 mt-0.5" />
           <div>
             <span className="font-semibold">Diagnostic Failure:</span> {error}
           </div>
@@ -86,7 +112,7 @@ export const SystemHealthPage: React.FC = () => {
       )}
 
       {/* Probes Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Core Liveness Probe */}
         <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card flex flex-col justify-between">
           <div>
@@ -94,159 +120,259 @@ export const SystemHealthPage: React.FC = () => {
               <span className="text-xs font-mono uppercase text-alpha-text-muted">Liveness Probe</span>
               <Server className="w-4 h-4 text-alpha-gold" />
             </div>
-            <div className="text-base font-semibold text-alpha-text-primary mb-1">
+            <div className="text-base font-semibold font-mono text-white mb-1">
               GET /health
             </div>
             <p className="text-xs text-alpha-text-secondary">
-              Asserts the ASGI worker process is responsive and receiving HTTP traffic.
+              Kubernetes liveness heartbeat verifying the event loop is responsive.
             </p>
           </div>
-          <div className="mt-4 pt-4 border-t border-alpha-borderSubtle flex items-center justify-between">
-            <span className="text-xs font-mono text-alpha-text-muted">Status:</span>
-            <HealthBadge status={health?.status || 'unknown'} />
+          <div className="mt-4 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between">
+            <span className="text-xs text-alpha-text-muted font-mono">Status:</span>
+            <HealthBadge
+              status={health?.status === 'healthy' ? 'healthy' : 'degraded'}
+              label={health?.status || 'Unknown'}
+            />
           </div>
         </div>
 
-        {/* Database Readiness Probe */}
+        {/* Readiness Probe */}
         <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-mono uppercase text-alpha-text-muted">Readiness Probe</span>
               <Database className="w-4 h-4 text-alpha-gold" />
             </div>
-            <div className="text-base font-semibold text-alpha-text-primary mb-1">
+            <div className="text-base font-semibold font-mono text-white mb-1">
               GET /ready
             </div>
             <p className="text-xs text-alpha-text-secondary">
-              Tests live connection pool and runs `SELECT 1` against the persistence layer.
+              Verifies TimescaleDB database connectivity and session health.
             </p>
           </div>
-          <div className="mt-4 pt-4 border-t border-alpha-borderSubtle flex items-center justify-between">
-            <span className="text-xs font-mono text-alpha-text-muted">Status:</span>
+          <div className="mt-4 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between">
+            <span className="text-xs text-alpha-text-muted font-mono">Database:</span>
             <HealthBadge
-              status={readiness?.ready ? 'ready' : 'unhealthy'}
-              latencyMs={readiness?.components.database?.latency_ms}
+              status={readiness?.components?.database?.connected ? 'healthy' : 'degraded'}
+              label={readiness?.components?.database?.connected ? 'Connected' : 'Offline'}
+              latencyMs={readiness?.components?.database?.latency_ms}
             />
           </div>
         </div>
 
-        {/* System Metadata */}
+        {/* Binance Collector Telemetry */}
         <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-mono uppercase text-alpha-text-muted">Service Runtime</span>
-              <Clock className="w-4 h-4 text-alpha-gold" />
+              <span className="text-xs font-mono uppercase text-alpha-text-muted">Binance Spot Feed</span>
+              <Radio className="w-4 h-4 text-alpha-gold" />
             </div>
-            <div className="text-base font-semibold text-alpha-text-primary mb-1">
-              GET /api/v1/system/status
+            <div className="text-base font-semibold font-mono text-white mb-1">
+              WebSocket Stream
             </div>
             <p className="text-xs text-alpha-text-secondary">
-              Versioned API diagnostics with system uptime and environment flags.
+              Sub-second public kline stream with exponential backoff reconnects.
             </p>
           </div>
-          <div className="mt-4 pt-4 border-t border-alpha-borderSubtle flex items-center justify-between text-xs font-mono">
-            <span className="text-alpha-text-muted">Uptime:</span>
-            <span className="text-alpha-gold font-semibold">
-              {systemInfo?.uptime_seconds ? `${systemInfo.uptime_seconds}s` : 'N/A'}
+          <div className="mt-4 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between">
+            <span className="text-xs text-alpha-text-muted font-mono">Feed State:</span>
+            <HealthBadge
+              status={marketStatus?.connected ? 'healthy' : 'degraded'}
+              label={marketStatus?.feed_state || 'STANDBY'}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Collector Diagnostics & Reconnection Stats */}
+      <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-alpha-borderSubtle pb-3">
+          <div className="flex items-center gap-2">
+            <Radio className="w-4 h-4 text-alpha-gold" />
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
+              Market Data Ingestion Telemetry
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-alpha-text-muted">BTC/USDT Spot</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Collector Lag</span>
+            <p className={`text-xl font-bold mt-1 ${collectorLagSeconds !== null && collectorLagSeconds > 120 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {collectorLagSeconds !== null ? `${collectorLagSeconds}s lag` : 'Standby'}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">Threshold: &lt;120s</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Reconnect Counts</span>
+            <p className="text-xl font-bold text-white mt-1">
+              {marketStatus?.reconnect_count ?? 0}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">Exponential Backoff</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Sequence Gaps</span>
+            <p className={`text-xl font-bold mt-1 ${(marketStatus?.gap_count ?? 0) > 0 ? 'text-amber-400' : 'text-white'}`}>
+              {marketStatus?.gap_count ?? 0}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">Auto REST Backfilled</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">IP Weight Remaining</span>
+            <p className="text-xl font-bold text-alpha-gold mt-1">
+              {marketStatus?.rate_limit_remaining ?? 1200}
+              <span className="text-xs text-alpha-text-muted font-normal"> / 1200</span>
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">60s Sliding Window</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Background Orchestration Worker Status */}
+      <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-alpha-borderSubtle pb-3">
+          <div className="flex items-center gap-2">
+            <Zap className="w-4 h-4 text-alpha-gold" />
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
+              Lifecycle Task Queue & Background Worker
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-alpha-text-muted">Single-Worker Invariant</span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Worker Status</span>
+            <p className="text-base font-bold text-white mt-1">
+              {orchestratorStatus?.is_running ? 'RUNNING' : 'IDLE'}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">
+              Lock Acquired: {orchestratorStatus?.lock_acquired ? 'YES' : 'NO'}
             </span>
           </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Completed Cycles</span>
+            <p className="text-xl font-bold text-white mt-1">
+              {orchestratorStatus?.cycles_completed ?? 0}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">Idempotent Execution</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Signals Evaluated</span>
+            <p className="text-xl font-bold text-alpha-gold mt-1">
+              {orchestratorStatus?.signals_evaluated ?? 0}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">Pre-Trade Risk Validated</span>
+          </div>
+
+          <div className="p-3.5 rounded-lg bg-alpha-surface border border-alpha-borderSubtle">
+            <span className="text-alpha-text-muted block text-[10px] uppercase">Simulated Orders</span>
+            <p className="text-xl font-bold text-emerald-400 mt-1">
+              {orchestratorStatus?.orders_submitted ?? 0}
+            </p>
+            <span className="text-[10px] text-alpha-text-muted">PaperBroker Submitted</span>
+          </div>
         </div>
       </div>
 
-      {/* Raw Diagnostic Details Table */}
-      <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-alpha-text-muted flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-alpha-gold" />
-          <span>Subsystem Parameters & Diagnostics</span>
-        </h2>
+      {/* System Environment & TimescaleDB Telemetry */}
+      {systemInfo && (
+        <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-alpha-borderSubtle pb-3">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-alpha-gold" />
+              <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
+                Environment & Database Telemetry
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono text-alpha-text-muted">
+              Uptime: {Math.round(systemInfo.uptime_seconds)}s
+            </span>
+          </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead>
-              <tr className="border-b border-alpha-borderSubtle text-alpha-text-muted">
-                <th className="py-2 pr-4">Subsystem</th>
-                <th className="py-2 pr-4">Parameter</th>
-                <th className="py-2 pr-4">Reported Value</th>
-                <th className="py-2">State</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-alpha-borderSubtle text-alpha-text-secondary">
-              <tr>
-                <td className="py-2.5 font-medium text-alpha-text-primary">FastAPI Engine</td>
-                <td className="py-2.5">Environment</td>
-                <td className="py-2.5">{systemInfo?.environment || 'development'}</td>
-                <td className="py-2.5 text-emerald-400">Verified</td>
-              </tr>
-              <tr>
-                <td className="py-2.5 font-medium text-alpha-text-primary">FastAPI Engine</td>
-                <td className="py-2.5">Version</td>
-                <td className="py-2.5">{systemInfo?.version || '1.0.0'}</td>
-                <td className="py-2.5 text-emerald-400">Verified</td>
-              </tr>
-              <tr>
-                <td className="py-2.5 font-medium text-alpha-text-primary">TimescaleDB / Postgres</td>
-                <td className="py-2.5">Dialect</td>
-                <td className="py-2.5">{systemInfo?.database?.dialect || 'postgresql+asyncpg'}</td>
-                <td className="py-2.5">
-                  <span className={systemInfo?.database?.connected ? 'text-emerald-400' : 'text-amber-400'}>
-                    {systemInfo?.database?.connected ? 'Online' : 'Pending Connect'}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <td className="py-2.5 font-medium text-alpha-text-primary">Database Roundtrip</td>
-                <td className="py-2.5">Latency</td>
-                <td className="py-2.5">
-                  {typeof systemInfo?.database?.latency_ms === 'number'
-                    ? `${systemInfo.database.latency_ms} ms`
-                    : 'N/A'}
-                </td>
-                <td className="py-2.5 text-alpha-text-muted">Measured</td>
-              </tr>
-              <tr>
-                <td className="py-2.5 font-medium text-alpha-text-primary">Alembic Migration</td>
-                <td className="py-2.5">Target Head</td>
-                <td className="py-2.5">0001_initial_schema</td>
-                <td className="py-2.5 text-emerald-400">Configured</td>
-              </tr>
-            </tbody>
-          </table>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+            <div>
+              <span className="text-alpha-text-muted block text-[10px] uppercase">Project Name</span>
+              <p className="font-semibold text-white mt-0.5">{systemInfo.project_name}</p>
+            </div>
+            <div>
+              <span className="text-alpha-text-muted block text-[10px] uppercase">Environment</span>
+              <p className="font-semibold text-white mt-0.5 uppercase">{systemInfo.environment}</p>
+            </div>
+            <div>
+              <span className="text-alpha-text-muted block text-[10px] uppercase">DB Dialect</span>
+              <p className="font-semibold text-white mt-0.5">{systemInfo.database.dialect || 'postgresql'}</p>
+            </div>
+            <div>
+              <span className="text-alpha-text-muted block text-[10px] uppercase">DB Latency</span>
+              <p className="font-semibold text-emerald-400 mt-0.5">
+                {systemInfo.database.latency_ms !== undefined ? `${systemInfo.database.latency_ms.toFixed(2)} ms` : '—'}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Audit Logs / Activity (Honest empty state or actual logs) */}
-      <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-alpha-text-muted flex items-center gap-2">
-          <Info className="w-4 h-4 text-alpha-gold" />
-          <span>System Initialization Logs</span>
-        </h2>
+      {/* Initialization & Diagnostic Logs */}
+      <div className="p-6 rounded-xl border border-alpha-border bg-alpha-card space-y-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-alpha-borderSubtle pb-3">
+          <div className="flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-alpha-gold" />
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-white">
+              System Audit & Initialization Logs ({auditLogs.length})
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-alpha-text-muted">Immutable SQLite/PG Records</span>
+        </div>
 
         {auditLogs.length === 0 ? (
-          <div className="py-8 text-center text-xs text-alpha-text-muted font-mono border border-dashed border-alpha-borderSubtle rounded-lg">
-            No system audit events recorded in database yet. (Honest empty state)
-          </div>
+          <p className="text-xs font-mono text-alpha-text-muted py-6 text-center">
+            No system audit logs recorded.
+          </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+          <div className="overflow-x-auto max-h-80 overflow-y-auto font-mono text-xs">
+            <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-alpha-borderSubtle text-alpha-text-muted">
-                  <th className="py-2 pr-4">Timestamp</th>
-                  <th className="py-2 pr-4">Component</th>
-                  <th className="py-2 pr-4">Event</th>
-                  <th className="py-2 pr-4">Status</th>
+                <tr className="border-b border-alpha-borderSubtle text-alpha-text-muted sticky top-0 bg-alpha-card">
+                  <th className="py-2 pr-3">Timestamp (UTC)</th>
+                  <th className="py-2 pr-3">Component</th>
+                  <th className="py-2 pr-3">Event Type</th>
+                  <th className="py-2 pr-3">Status</th>
                   <th className="py-2">Message</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-alpha-borderSubtle text-alpha-text-secondary">
+              <tbody className="divide-y divide-alpha-borderSubtle/60 text-alpha-text-secondary">
                 {auditLogs.map((log) => (
-                  <tr key={log.id}>
-                    <td className="py-2 pr-4 text-alpha-text-muted">
-                      {new Date(log.created_at).toLocaleTimeString()}
+                  <tr key={log.id} className="hover:bg-alpha-cardHover transition-colors">
+                    <td className="py-2 pr-3 text-alpha-text-muted whitespace-nowrap">
+                      {new Date(log.created_at).toISOString().replace('T', ' ').substring(0, 19)}
                     </td>
-                    <td className="py-2 pr-4 font-semibold text-alpha-text-primary">{log.component}</td>
-                    <td className="py-2 pr-4">{log.event_type}</td>
-                    <td className="py-2 pr-4 text-emerald-400">{log.status}</td>
-                    <td className="py-2">{log.message}</td>
+                    <td className="py-2 pr-3 text-alpha-gold font-semibold whitespace-nowrap">
+                      {log.component}
+                    </td>
+                    <td className="py-2 pr-3 text-white whitespace-nowrap">
+                      {log.event_type}
+                    </td>
+                    <td className="py-2 pr-3">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                          log.status === 'success' || log.status === 'ok'
+                            ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+                            : 'bg-amber-950/40 text-amber-400 border-amber-800/40'
+                        }`}
+                      >
+                        {log.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="py-2 text-[11px] text-alpha-text-secondary">
+                      {log.message}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -257,3 +383,5 @@ export const SystemHealthPage: React.FC = () => {
     </div>
   );
 };
+
+export default SystemHealthPage;

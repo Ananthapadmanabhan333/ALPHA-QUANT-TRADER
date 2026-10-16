@@ -1,6 +1,16 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, PieChart, LineChart, History, Activity, X } from 'lucide-react';
+import {
+  LayoutDashboard,
+  TrendingUp,
+  Briefcase,
+  LineChart,
+  History,
+  ShieldAlert,
+  FlaskConical,
+  Activity,
+  X,
+} from 'lucide-react';
 import { Logo } from '../common/Logo';
 
 interface AppSidebarProps {
@@ -11,46 +21,52 @@ interface AppSidebarProps {
 export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
   const navItems = [
     {
-      name: 'System Overview',
+      name: 'Overview',
       path: '/',
       icon: LayoutDashboard,
-      phase: 1,
-      badge: 'Active',
+      badge: 'Live',
     },
     {
-      name: 'Market Data Feed',
-      path: '/market-data',
+      name: 'Markets',
+      path: '/markets',
       icon: TrendingUp,
-      phase: 2,
-      badge: 'Live Feed',
+      badge: 'Feed',
     },
     {
-      name: 'Paper Execution & Risk',
-      path: '/portfolio',
-      icon: PieChart,
-      phase: 5,
-      badge: 'Phase 5',
-    },
-    {
-      name: 'Quant Strategies',
+      name: 'Strategies',
       path: '/strategies',
       icon: LineChart,
-      phase: 3,
-      badge: 'Phase 3',
+      badge: 'Models',
     },
     {
-      name: 'Backtesting Engine',
-      path: '/backtests',
+      name: 'Backtesting',
+      path: '/backtesting',
       icon: History,
-      phase: 4,
-      badge: 'Phase 4',
+      badge: 'Engine',
     },
     {
-      name: 'System Diagnostics',
+      name: 'Paper Trading',
+      path: '/paper-trading',
+      icon: Briefcase,
+      badge: 'Sim',
+    },
+    {
+      name: 'Risk Management',
+      path: '/risk',
+      icon: ShieldAlert,
+      badge: 'Gate',
+    },
+    {
+      name: 'Experiments',
+      path: '/experiments',
+      icon: FlaskConical,
+      badge: 'Audit',
+    },
+    {
+      name: 'System Health',
       path: '/system-health',
       icon: Activity,
-      phase: 1,
-      badge: 'Live',
+      badge: 'Status',
     },
   ];
 
@@ -111,13 +127,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
                   <span>{item.name}</span>
                 </div>
 
-                <span
-                  className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                    item.phase <= 3
-                      ? 'bg-amber-950/40 text-amber-400 border-amber-800/40'
-                      : 'bg-alpha-card text-alpha-text-muted border-alpha-borderSubtle'
-                  }`}
-                >
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded border bg-alpha-card text-alpha-gold/80 border-alpha-borderSubtle">
                   {item.badge}
                 </span>
               </NavLink>
