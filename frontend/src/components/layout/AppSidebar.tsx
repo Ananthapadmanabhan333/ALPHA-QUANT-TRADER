@@ -25,11 +25,11 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
       badge: 'Live Feed',
     },
     {
-      name: 'Portfolio Engine',
+      name: 'Paper Execution & Risk',
       path: '/portfolio',
       icon: PieChart,
-      phase: 2,
-      badge: 'Phase 2',
+      phase: 5,
+      badge: 'Phase 5',
     },
     {
       name: 'Quant Strategies',

@@ -1,6 +1,6 @@
 # ALPHA Quant — Institutional Trading Platform
 
-[![Phase](https://img.shields.io/badge/Phase-4%3A%20Deterministic%20Backtesting-gold.svg)](#)
+[![Phase](https://img.shields.io/badge/Phase-5%3A%20Paper%20Execution%20%26%20Risk-gold.svg)](#)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-emerald.svg)](#)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](#)
@@ -17,7 +17,9 @@
 - **Phase 1 (Foundation)**: Monorepo architecture, FastAPI application factory, lifespan management, structured JSON logging, central RFC-compliant exception handling, TimescaleDB / PostgreSQL persistence, Alembic migrations, and React strict mode shell.
 - **Phase 2 (Market Data Subsystem)**: Binance Spot public market data adapter, historical REST OHLCV ingestion (1m, 5m, 15m), live WebSocket streaming with automatic reconnects and exponential backoff jitter, strict price/volume/timestamp integrity validation, separate exchange and ingestion UTC timestamps, open vs. finalized candle distinction, database constraints preventing duplicates, sequence gap detection, rate-limited REST backfills, restart recovery, and live telemetry endpoints.
 - **Phase 3 (Quantitative Strategies & Research Pipeline)**: Mathematical feature engineering pipeline (SMA, EMA, simple and logarithmic returns, rolling volatility, rolling z-score, ATR, volume statistics, multi-period momentum, and graceful order-book imbalance handling). Zero-lookahead bias enforcement and incomplete candle rejection. Typed non-executing strategy interface returning immutable auditable Signals. Three baseline long-only spot research strategies (Trend Following, Mean Reversion, Volatility-Normalized Momentum with transaction cost hurdles). Cryptographic dataset fingerprinting (SHA-256) and persistent experiment ledger tracking (`strategy_experiments` and `strategy_signals`).
-- **Phase 4 (Deterministic Historical Backtesting Engine)**: Event-driven historical simulation engine with chronological event loop. Strict next-bar Open execution model preventing look-ahead fill bias. Explicit cost separation (Gross P&L, Maker/Taker fees, adverse slippage penalty, Net P&L). Strict portfolio ledger invariants ($\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$, $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$). Liquidity participation constraints (capped at $10\%$ of bar volume). Comprehensive validation framework: chronological train/validation/untouched holdout splits, rolling walk-forward evaluation, 4-regime classification (Bullish, Bearish, Choppy, High Volatility), passive buy-and-hold benchmark, no-trade baseline, and multi-scenario cost/latency stress testing (2x/5x fees, 3x slippage, severe stress, delayed execution by 1 bar). High-precision analytics (Sharpe, Sortino, max drawdown, win rate, profit factor, expectancy, turnover, exposure, cost drag, 95% bootstrap confidence intervals) persisted in TimescaleDB/PostgreSQL (`backtest_runs` & `backtest_trades`) and exposed via REST APIs and an institutional React frontend.
+- **Phase 4 (Deterministic Historical Backtesting Engine)**: Event-driven historical simulation engine with chronological event loop. Strict next-bar Open execution model preventing look-ahead fill bias. Explicit cost separation (Gross P&L, Maker/Taker fees, adverse slippage penalty, Net P&L). Strict portfolio ledger invariants ($\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$, $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$). Liquidity participation constraints (capped at $10\%$ of bar volume). Comprehensive validation framework: chronological train/validation/untouched holdout splits, rolling walk-forward evaluation, 4-regime classification (Bullish, Bearish, Choppy, High Volatility), passive buy-and-hold benchmark, no-trade baseline, and multi-scenario cost/latency stress testing (2x/5x fees, 3x slippage, severe stress, delayed execution by 1 bar). High-precision analytics persisted in TimescaleDB/PostgreSQL (`backtest_runs` & `backtest_trades`) and exposed via REST APIs and an institutional React frontend.
+- **Phase 5 (Paper Execution & Central Risk Subsystem)**: Dedicated PaperBroker simulating spot execution without live trading capabilities. Strict pre-trade Central Risk Gate enforcing maximum order notional ($10,000), position concentration (10% of equity), aggregate exposure (80%), daily loss limits (2%), peak-to-trough drawdown limits (5%), consecutive loss streak halts, data-freshness guards (max 300s feed age), and spread/liquidity filters. Transactional atomicity for orders, fills, positions, and balance mutations with idempotent submissions (`client_order_id`). Emergency Stop kill switch with strict non-resetting restart recovery, operational ledger reconciliation, and institutional React control console (`/portfolio`).
+
 
 ---
 
@@ -52,10 +54,18 @@ Alpha Quant/
 │   │   │   ├── schemas.py               # Pydantic schemas for backtest runs & trades
 │   │   │   ├── service.py               # Backtest persistence & analytics service
 │   │   │   └── validation.py            # Chronological splits, holdout & walk-forward generator
+│   │   ├── paper/                       # Dedicated paper execution & central risk engine
+│   │   │   ├── broker.py                # Simulated spot broker, fills, & reconciliation
+│   │   │   ├── constants.py             # Default risk limits, fees, order states
+│   │   │   ├── exceptions.py            # Risk breach, balance, and invariant exceptions
+│   │   │   ├── risk_gate.py             # Central Pre-Trade Risk Gate & limit reset logic
+│   │   │   ├── schemas.py               # Pydantic schemas for orders, accounts, risk status
+│   │   │   └── service.py               # Paper trading application orchestration service
 │   │   ├── cli/
 │   │   │   ├── ingest.py                # Public market data historical ingestion CLI
 │   │   │   ├── run_strategy.py          # Strategy experiment execution & signal generation CLI
-│   │   │   └── run_backtest.py          # Event-driven historical backtesting CLI
+│   │   │   ├── run_backtest.py          # Event-driven historical backtesting CLI
+│   │   │   └── run_paper.py             # Paper execution & risk operations CLI
 │   │   ├── core/
 │   │   │   ├── config.py                # Pydantic Settings & environment validation
 │   │   │   ├── exceptions.py            # Central domain exceptions
@@ -104,6 +114,7 @@ Alpha Quant/
 │   │   │   ├── market.py                # TimescaleDB MarketCandle model
 │   │   │   ├── strategy.py              # StrategyExperiment & StrategySignal models
 │   │   │   ├── backtest.py              # BacktestRun & BacktestTradeLog models
+│   │   │   ├── paper.py                 # PaperAccount, Order, Fill, Position, Risk models
 │   │   │   └── system.py                # SystemAuditLog model
 │   │   ├── schemas/
 │   │   │   └── health.py                # Health & readiness validation schemas
@@ -113,7 +124,8 @@ Alpha Quant/
 │   │   │   ├── 0001_initial_schema.py   # Baseline system audit schema
 │   │   │   ├── 0002_market_candles_schema.py # TimescaleDB hypertable candles schema
 │   │   │   ├── 0003_strategy_experiments_schema.py # Experiment ledger & signals schema
-│   │   │   └── 0004_backtest_schema.py  # Backtest runs & trades persistent schema
+│   │   │   ├── 0004_backtest_schema.py  # Backtest runs & trades persistent schema
+│   │   │   └── 0005_paper_execution_schema.py # Paper trading & risk management schema
 │   │   ├── env.py                       # Alembic migration runner
 │   │   └── script.py.mako
 │   ├── tests/
@@ -133,6 +145,9 @@ Alpha Quant/
 │   │   ├── test_backtest_execution.py   # Event-driven next-bar fills, fees & slippage tests
 │   │   ├── test_backtest_validation.py  # Splits, holdouts, walk-forward & regimes tests
 │   │   ├── test_backtest_api.py         # Backtest simulation & performance REST API tests
+│   │   ├── test_paper_broker.py         # PaperBroker execution, balances, partial fills tests
+│   │   ├── test_paper_risk.py           # CentralRiskGate, limits, and invariant safety tests
+│   │   ├── test_paper_api.py            # Paper trading and risk management REST API tests
 │   │   └── test_system.py               # Status diagnostics & honest empty state tests
 │   ├── alembic.ini                      # Migration configuration
 │   ├── Dockerfile                       # Multi-stage production container spec
@@ -304,10 +319,35 @@ $env:DATABASE_URL="sqlite+aiosqlite:///alpha_quant.db"
 
 ---
 
+## 🛡️ Paper Execution & Central Risk Operations CLI
+
+ALPHA Quant includes a dedicated CLI for inspecting virtual paper accounts, evaluating pre-trade risk controls, submitting simulated orders, and executing emergency halts:
+
+```powershell
+cd backend
+# Inspect virtual cash, positions, unrealized P&L, and Central Risk Gate status:
+$env:DATABASE_URL="sqlite+aiosqlite:///alpha_quant.db"
+.venv\Scripts\python app\cli\run_paper.py --action status --symbol BTCUSDT
+
+# Submit a simulated BUY market order through the Central Risk Gate:
+.venv\Scripts\python app\cli\run_paper.py --action order --side buy --type market --quantity 0.01 --symbol BTCUSDT
+
+# Trigger an emergency stop to halt all new simulated entries:
+.venv\Scripts\python app\cli\run_paper.py --action emergency-stop --reason "Manual risk test"
+
+# Clear emergency stop and resume simulated trading:
+.venv\Scripts\python app\cli\run_paper.py --action resume --confirmation CONFIRM_RESUME
+
+# Perform ledger reconciliation:
+.venv\Scripts\python app\cli\run_paper.py --action reconcile --symbol BTCUSDT
+```
+
+---
+
 ## 🧪 Verification & Testing Commands
 
 ### Backend Automated Test Suite
-Run all 75 automated tests (event-driven next-bar fills, adverse slippage, ledger invariants, liquidity constraints, train/validation/holdout splits, walk-forward generator, market regimes, feature formulas, look-ahead prevention, strategies, REST/WS adapters, database idempotency, and API endpoints):
+Run all 94 automated tests (paper broker execution, risk gate invariants, live trading safety, insufficient balances, partial fills, event-driven next-bar fills, adverse slippage, ledger invariants, liquidity constraints, train/validation/holdout splits, walk-forward generator, market regimes, feature formulas, look-ahead prevention, strategies, REST/WS adapters, database idempotency, and API endpoints):
 ```powershell
 cd backend
 .venv\Scripts\pytest -v
@@ -348,29 +388,47 @@ npm run build
 | `GET` | `/api/v1/backtests` | List Backtests | Queries historical backtest runs filtered by strategy or symbol. |
 | `GET` | `/api/v1/backtests/{id}` | Backtest Details | Returns full equity curve snapshots, fill logs, and stress scenario results. |
 | `GET` | `/api/v1/analytics/performance` | Performance Analytics | Computes aggregated Sharpe, Drawdown, and return metrics across backtests. |
+| `GET` | `/api/v1/paper/account` | Paper Account Overview | Returns virtual cash, positions, cost basis, and realized/unrealized P&L. |
+| `POST` | `/api/v1/paper/orders` | Submit Paper Order | Validates via Central Risk Gate and executes simulated order. |
+| `GET` | `/api/v1/paper/orders` | List Paper Orders | Queries historical simulated orders and filter by status. |
+| `GET` | `/api/v1/paper/orders/{id}` | Order Fills Details | Returns execution fills, fees, and slippage cost breakdown for an order. |
+| `DELETE` | `/api/v1/paper/orders/{id}` | Cancel Paper Order | Cancels an open or partially filled simulated limit order. |
+| `GET` | `/api/v1/paper/positions` | List Positions | Returns current simulated spot holdings valued at mark price. |
+| `GET` | `/api/v1/paper/risk/status` | Risk Gate Status | Live telemetry for drawdown, daily P&L, feed health, and emergency stop. |
+| `POST` | `/api/v1/paper/risk/emergency-stop` | Emergency Stop | Halts all simulated entry orders immediately. |
+| `POST` | `/api/v1/paper/risk/resume` | Resume Trading | Clears emergency halt with explicit confirmation token `CONFIRM_RESUME`. |
+| `POST` | `/api/v1/paper/match-market` | Match Intrabar Price | Evaluates and fills resting limit orders against market price tick. |
 
 ---
 
-## 🛡️ Phase 4 Acceptance Criteria Checklist
+## 🛡️ Phase 5 Acceptance Criteria Checklist
 
-- [x] **Event-driven execution model**: Chronological bar processing, strictly executing market orders at bar $t+1$ Open with documented adverse fill rules.
-- [x] **Zero future leakage**: Historical fills never use future prices or intrabar peaks to improve execution.
-- [x] **Separated financial cost accounting**: Tracks Gross P&L, Maker/Taker fees, adverse slippage drag, and Net P&L independently.
-- [x] **Portfolio ledger invariants**: Fixed-precision accounting rigorously guarantees $\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$ and $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$ at every timestamp.
-- [x] **Liquidity constraints**: Maximum candle volume participation cap ($10\%$) enforced; cash overdrafts prevented.
-- [x] **Comprehensive validation**:
-  - Chronological train/validation/untouched holdout splits preventing data snooping.
-  - Rolling walk-forward evaluation generator.
-  - Passive Buy-and-Hold benchmark and No-Trade baseline for comparative attribution.
-  - Market regime decomposition (Bullish, Bearish, Choppy, High Volatility).
-- [x] **Cost and latency stress testing**:
-  - High fee stress (2x and 5x fee schedule).
-  - High slippage stress (3x adverse slippage).
-  - Severe combined stress.
-  - 1-bar execution delay latency simulation.
-- [x] **Institutional performance analytics**: Net return %, annualized Sharpe ratio ($525,600$ min/year for 24/7/365 crypto, $r_f=0.0\%$), Sortino ratio, max drawdown %, profit factor, win rate %, expectancy, turnover, market exposure %, fee/slippage drag, and 95% bootstrap confidence intervals.
-- [x] **Database persistence & fingerprinting**: `backtest_runs` and `backtest_trades` tables storing complete execution history, dataset SHA-256 fingerprint, parameters, and equity curves.
-- [x] **REST API endpoints**: `POST /api/v1/backtests`, `GET /api/v1/backtests/{run_id}`, and `GET /api/v1/analytics/performance`.
-- [x] **React + TypeScript frontend**: Branded dark/gold institutional Backtesting Engine page (`/backtests`) with interactive simulation launcher, metric cards, equity curves, stress test cards, and simulated trade logs.
-- [x] **All tests pass**: 75/75 automated backend tests pass, frontend strict TypeScript compiles cleanly, production bundle compiles in 2.37s.
+- [x] **Dedicated PaperBroker**: Supports virtual USDT balance ($10,000 default), simulated spot inventory, market & limit orders, order cancellation, configurable fees (8 bps maker / 10 bps taker) and adverse slippage (5 bps).
+- [x] **Strict balance & inventory accounting**: Rejects orders when cash or spot inventory is insufficient. Strategies cannot mutate account balances directly.
+- [x] **Partial fills supported**: Orders exceeding the maximum liquidity participation cap (10% of bar volume) are partially filled.
+- [x] **Central Risk Gate**: Every candidate order must pass the backend risk gate before execution:
+  - Maximum order notional limit ($10,000 USD default).
+  - Maximum single position concentration limit (10% of virtual equity).
+  - Maximum aggregate portfolio exposure limit (80% of virtual equity).
+  - Daily loss threshold (2% of starting daily equity, resets at 00:00 UTC).
+  - Peak-to-trough drawdown threshold (5% peak equity loss triggers halt).
+  - Consecutive loss streak threshold (3 consecutive loss trades blocks entries).
+  - Market data freshness guard (candles older than 300s reject new entries).
+  - Spread filter (spreads > 50 bps rejected).
+  - Invalid price and non-positive quantity rejection.
+  - Emergency Pause / Kill switch blocking all entry orders.
+- [x] **Transactional atomicity**: All related fills, fees, positions, and balance mutations execute within an atomic database transaction. Retried events do not create duplicate fills.
+- [x] **Strict Safety Invariants**:
+  - The application cannot submit real exchange orders.
+  - The broker accepts only simulated execution.
+  - No exchange trading credentials (API keys / secrets) are stored.
+  - Live trading configurations (`is_live=True`) are strictly rejected.
+  - No frontend action bypasses the backend risk gate.
+  - Portfolio state is derived from persisted ledger events.
+  - Risk limits and controls are never silently reset after a system restart.
+- [x] **Database persistence & migration**: Tables `paper_accounts`, `paper_orders`, `paper_fills`, `paper_positions`, `paper_risk_state`, and `paper_risk_events` applied cleanly via Alembic migration `0005_paper_execution_schema.py`.
+- [x] **REST API endpoints**: Complete `/api/v1/paper` routing suite for accounts, orders, positions, and risk control.
+- [x] **React + TypeScript frontend**: Upgraded `/portfolio` into a comprehensive Institutional Paper Trading & Risk Operations console with live order entry, positions table, order history, and emergency halt controls.
+- [x] **All tests pass**: 94/94 automated backend tests pass, frontend strict TypeScript compiles cleanly, production bundle compiles in 1.84s.
+
 

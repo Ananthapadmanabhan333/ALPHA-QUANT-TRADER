@@ -13,6 +13,11 @@ import {
   BacktestListResponse,
   PerformanceAnalyticsResponse,
   BacktestCreateRequest,
+  PaperAccount,
+  PaperOrder,
+  PaperFill,
+  RiskStatus,
+  PaperOrderCreateRequest,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -140,4 +145,78 @@ export async function fetchPerformanceAnalytics(
   const res = await fetch(`${API_BASE_URL}/api/v1/analytics/performance?${params.toString()}`);
   return handleResponse<PerformanceAnalyticsResponse>(res);
 }
+
+// ==========================================
+// Phase 5: Paper Execution & Risk API
+// ==========================================
+
+export async function fetchPaperAccount(symbol: string = 'BTCUSDT'): Promise<PaperAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/account?symbol=${symbol}`);
+  return handleResponse<PaperAccount>(res);
+}
+
+export async function fetchPaperOrders(
+  status?: string,
+  symbol?: string,
+  limit: number = 50,
+): Promise<PaperOrder[]> {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (status) params.append('status', status);
+  if (symbol) params.append('symbol', symbol);
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders?${params.toString()}`);
+  return handleResponse<PaperOrder[]>(res);
+}
+
+export async function fetchPaperOrderDetails(
+  orderId: string,
+): Promise<{ order: PaperOrder; fills: PaperFill[] }> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders/${orderId}`);
+  return handleResponse<{ order: PaperOrder; fills: PaperFill[] }>(res);
+}
+
+export async function submitPaperOrder(payload: PaperOrderCreateRequest): Promise<PaperOrder> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<PaperOrder>(res);
+}
+
+export async function cancelPaperOrder(orderId: string): Promise<PaperOrder> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders/${orderId}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<PaperOrder>(res);
+}
+
+export async function fetchRiskStatus(symbol: string = 'BTCUSDT'): Promise<RiskStatus> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/risk/status?symbol=${symbol}`);
+  return handleResponse<RiskStatus>(res);
+}
+
+export async function triggerEmergencyStop(reason: string): Promise<RiskStatus> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/risk/emergency-stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  return handleResponse<RiskStatus>(res);
+}
+
+export async function resumeEmergencyStop(
+  confirmation: string = 'CONFIRM_RESUME',
+  resetConsecutiveLosses: boolean = false,
+): Promise<RiskStatus> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/risk/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      confirmation,
+      reset_consecutive_losses: resetConsecutiveLosses,
+    }),
+  });
+  return handleResponse<RiskStatus>(res);
+}
+
 

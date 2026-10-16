@@ -265,3 +265,97 @@ export interface BacktestCreateRequest {
   stress_scenarios?: boolean;
 }
 
+// ==========================================
+// Phase 5: Paper Execution & Risk Types
+// ==========================================
+
+export interface PaperOrder {
+  id: string;
+  client_order_id: string;
+  account_id: string;
+  symbol: string;
+  side: string;
+  order_type: string;
+  quantity: number;
+  price?: number | null;
+  filled_quantity: number;
+  avg_fill_price?: number | null;
+  status: string;
+  fee: number;
+  slippage_cost: number;
+  rejection_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaperFill {
+  id: string;
+  order_id: string;
+  symbol: string;
+  side: string;
+  fill_price: number;
+  quantity: number;
+  gross_notional: number;
+  fee: number;
+  slippage_cost: number;
+  realized_pnl: number;
+  created_at: string;
+}
+
+export interface PaperPosition {
+  symbol: string;
+  quantity: number;
+  avg_entry_price: number;
+  cost_basis: number;
+  current_price: number;
+  market_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_pct: number;
+  realized_pnl: number;
+}
+
+export interface PaperAccount {
+  account_id: string;
+  name: string;
+  virtual_balance: number;
+  currency: string;
+  total_positions_value: number;
+  total_equity: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  positions: PaperPosition[];
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RiskStatus {
+  emergency_stop: boolean;
+  kill_switch_reason?: string | null;
+  max_order_notional: number;
+  max_position_pct: number;
+  max_portfolio_exposure_pct: number;
+  daily_loss_limit_pct: number;
+  max_drawdown_limit_pct: number;
+  consecutive_loss_limit: number;
+  starting_daily_equity: number;
+  current_daily_pnl: number;
+  peak_equity: number;
+  current_drawdown_pct: number;
+  consecutive_losses: number;
+  last_breach_reason?: string | null;
+  feed_status: string;
+  last_feed_time?: string | null;
+  is_trading_allowed: boolean;
+}
+
+export interface PaperOrderCreateRequest {
+  symbol?: string;
+  side: 'buy' | 'sell';
+  order_type?: 'market' | 'limit';
+  quantity: number;
+  price?: number;
+  client_order_id?: string;
+  current_market_price?: number;
+}
+
+
