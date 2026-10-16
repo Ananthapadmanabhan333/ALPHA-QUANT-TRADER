@@ -5,6 +5,10 @@ import {
   SystemAuditLog,
   CandlesListResponse,
   MarketStatusResponse,
+  StrategyInfo,
+  StrategyExperiment,
+  ExperimentListResponse,
+  RunStrategyRequest,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -61,4 +65,35 @@ export async function fetchMarketStatus(
   const query = new URLSearchParams({ symbol, interval });
   const res = await fetch(`${API_BASE_URL}/api/v1/market/status?${query.toString()}`);
   return handleResponse<MarketStatusResponse>(res);
+}
+
+export async function fetchStrategies(): Promise<StrategyInfo[]> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/strategies`);
+  return handleResponse<StrategyInfo[]>(res);
+}
+
+export async function runStrategy(payload: RunStrategyRequest): Promise<StrategyExperiment> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/strategies/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<StrategyExperiment>(res);
+}
+
+export async function fetchExperiments(
+  strategyId?: string,
+  symbol?: string,
+  limit: number = 50,
+): Promise<ExperimentListResponse> {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (strategyId) params.append('strategy_id', strategyId);
+  if (symbol) params.append('symbol', symbol);
+  const res = await fetch(`${API_BASE_URL}/api/v1/strategies/experiments?${params.toString()}`);
+  return handleResponse<ExperimentListResponse>(res);
+}
+
+export async function fetchExperimentDetails(experimentId: string): Promise<StrategyExperiment> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/strategies/experiments/${experimentId}`);
+  return handleResponse<StrategyExperiment>(res);
 }

@@ -99,3 +99,60 @@ export interface MarketStatusResponse {
   rate_limit_remaining: number;
   timestamp: string;
 }
+
+export type SignalSide = 'buy' | 'sell' | 'hold';
+
+export interface StrategyInfo {
+  strategy_id: string;
+  name: string;
+  version: string;
+  description: string;
+  candidate_parameters: Record<string, unknown>;
+  features_used: string[];
+}
+
+export interface StrategySignal {
+  strategy_id: string;
+  strategy_version: string;
+  decision_timestamp: string;
+  symbol: string;
+  side: SignalSide | string;
+  signal_score: number;
+  reference_price: number;
+  reason: string;
+  relevant_features: Record<string, number | null>;
+  config_id: string;
+}
+
+export interface StrategyExperiment {
+  id: string;
+  strategy_id: string;
+  strategy_version: string;
+  config_id: string;
+  symbol: string;
+  interval: string;
+  time_range_start: string;
+  time_range_end: string;
+  candle_count: number;
+  dataset_fingerprint: string;
+  parameters: Record<string, unknown>;
+  total_signals: number;
+  buy_signals: number;
+  sell_signals: number;
+  hold_signals: number;
+  created_at: string;
+  signals?: StrategySignal[];
+}
+
+export interface ExperimentListResponse {
+  count: number;
+  experiments: StrategyExperiment[];
+}
+
+export interface RunStrategyRequest {
+  strategy_id: string;
+  symbol?: string;
+  interval?: string;
+  parameters?: Record<string, unknown>;
+  limit?: number;
+}

@@ -67,6 +67,9 @@ class Settings(BaseSettings):
         if isinstance(v, str) and v.strip():
             return v
         data = values.data
+        async_url = data.get("DATABASE_URL")
+        if isinstance(async_url, str) and "sqlite" in async_url:
+            return async_url.replace("sqlite+aiosqlite://", "sqlite://")
         user = data.get("POSTGRES_USER", "postgres")
         pwd = data.get("POSTGRES_PASSWORD", "postgres_secure_placeholder")
         server = data.get("POSTGRES_SERVER", "localhost")

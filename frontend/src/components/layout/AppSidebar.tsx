@@ -83,7 +83,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
 
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isPhase1 = item.phase === 1;
 
             return (
               <NavLink
@@ -107,8 +106,8 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
 
                 <span
                   className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
-                    isPhase1
-                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'
+                    item.phase <= 3
+                      ? 'bg-amber-950/40 text-amber-400 border-amber-800/40'
                       : 'bg-alpha-card text-alpha-text-muted border-alpha-borderSubtle'
                   }`}
                 >
