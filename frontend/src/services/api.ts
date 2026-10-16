@@ -9,6 +9,10 @@ import {
   StrategyExperiment,
   ExperimentListResponse,
   RunStrategyRequest,
+  BacktestRun,
+  BacktestListResponse,
+  PerformanceAnalyticsResponse,
+  BacktestCreateRequest,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -97,3 +101,43 @@ export async function fetchExperimentDetails(experimentId: string): Promise<Stra
   const res = await fetch(`${API_BASE_URL}/api/v1/strategies/experiments/${experimentId}`);
   return handleResponse<StrategyExperiment>(res);
 }
+
+// ==========================================
+// Phase 4: Backtesting Engine API
+// ==========================================
+
+export async function createBacktest(payload: BacktestCreateRequest): Promise<BacktestRun> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/backtests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<BacktestRun>(res);
+}
+
+export async function fetchBacktestRuns(
+  strategyId?: string,
+  symbol?: string,
+  limit: number = 50,
+): Promise<BacktestListResponse> {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (strategyId) params.append('strategy_id', strategyId);
+  if (symbol) params.append('symbol', symbol);
+  const res = await fetch(`${API_BASE_URL}/api/v1/backtests?${params.toString()}`);
+  return handleResponse<BacktestListResponse>(res);
+}
+
+export async function fetchBacktestRun(runId: string): Promise<BacktestRun> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/backtests/${runId}`);
+  return handleResponse<BacktestRun>(res);
+}
+
+export async function fetchPerformanceAnalytics(
+  strategyId?: string,
+): Promise<PerformanceAnalyticsResponse> {
+  const params = new URLSearchParams();
+  if (strategyId) params.append('strategy_id', strategyId);
+  const res = await fetch(`${API_BASE_URL}/api/v1/analytics/performance?${params.toString()}`);
+  return handleResponse<PerformanceAnalyticsResponse>(res);
+}
+

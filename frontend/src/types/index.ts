@@ -156,3 +156,112 @@ export interface RunStrategyRequest {
   parameters?: Record<string, unknown>;
   limit?: number;
 }
+
+// ==========================================
+// Phase 4: Backtesting Engine Types
+// ==========================================
+
+export interface EquitySnapshot {
+  timestamp: string;
+  cash: number;
+  positions_value: number;
+  total_equity: number;
+  gross_pnl: number;
+  net_pnl: number;
+  cumulative_fees: number;
+  cumulative_slippage: number;
+  drawdown_pct: number;
+  in_position: boolean;
+}
+
+export interface BacktestTrade {
+  trade_id: string;
+  order_id: string;
+  timestamp: string;
+  symbol: string;
+  side: string;
+  fill_price: number;
+  quantity: number;
+  gross_notional: number;
+  fee: number;
+  slippage_cost: number;
+  realized_gross_pnl: number;
+  realized_net_pnl: number;
+}
+
+export interface StressScenarioResult {
+  scenario: string;
+  net_return_pct: number;
+  max_drawdown_pct: number;
+  total_fees: number;
+  total_slippage: number;
+}
+
+export interface RegimePerformance {
+  candles_count: number;
+  time_pct: number;
+  gross_return_pct: number;
+}
+
+export interface BacktestRun {
+  id: string;
+  strategy_id: string;
+  strategy_version: string;
+  config_id: string;
+  symbol: string;
+  interval: string;
+  time_range_start: string;
+  time_range_end: string;
+  candle_count: number;
+  dataset_fingerprint: string;
+  parameters: Record<string, unknown>;
+  cost_assumptions: Record<string, unknown>;
+  status: string;
+  metrics: Record<string, unknown>;
+  total_trades: number;
+  net_return_pct: number;
+  sharpe_ratio: number;
+  max_drawdown_pct: number;
+  profit_factor?: number | null;
+  win_rate_pct: number;
+  created_at: string;
+  completed_at?: string | null;
+  equity_curve?: EquitySnapshot[];
+  trades?: BacktestTrade[];
+  regime_performance?: Record<string, RegimePerformance>;
+  stress_test_results?: Record<string, StressScenarioResult>;
+}
+
+export interface BacktestListResponse {
+  count: number;
+  backtests: BacktestRun[];
+}
+
+export interface PerformanceAnalyticsResponse {
+  strategy_id?: string | null;
+  total_backtests: number;
+  avg_net_return_pct: number;
+  avg_sharpe_ratio: number;
+  avg_max_drawdown_pct: number;
+  best_net_return_pct: number;
+  worst_net_return_pct: number;
+  runs: Array<Record<string, unknown>>;
+}
+
+export interface BacktestCreateRequest {
+  strategy_id: string;
+  symbol?: string;
+  interval?: string;
+  initial_cash?: number;
+  start_time?: string;
+  end_time?: string;
+  parameters?: Record<string, unknown>;
+  cost_assumptions?: {
+    maker_fee_bps?: number;
+    taker_fee_bps?: number;
+    slippage_bps?: number;
+    max_volume_pct?: number;
+  };
+  stress_scenarios?: boolean;
+}
+

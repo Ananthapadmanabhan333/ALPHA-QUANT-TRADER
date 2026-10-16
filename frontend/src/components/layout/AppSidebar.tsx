@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, PieChart, LineChart, Activity, X } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, PieChart, LineChart, History, Activity, X } from 'lucide-react';
 import { Logo } from '../common/Logo';
 
 interface AppSidebarProps {
@@ -37,6 +37,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isOpen, onClose }) => {
       icon: LineChart,
       phase: 3,
       badge: 'Phase 3',
+    },
+    {
+      name: 'Backtesting Engine',
+      path: '/backtests',
+      icon: History,
+      phase: 4,
+      badge: 'Phase 4',
     },
     {
       name: 'System Diagnostics',

@@ -1,6 +1,6 @@
 # ALPHA Quant — Institutional Trading Platform
 
-[![Phase](https://img.shields.io/badge/Phase-3%3A%20Quantitative%20Strategies-gold.svg)](#)
+[![Phase](https://img.shields.io/badge/Phase-4%3A%20Deterministic%20Backtesting-gold.svg)](#)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-emerald.svg)](#)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](#)
@@ -17,6 +17,7 @@
 - **Phase 1 (Foundation)**: Monorepo architecture, FastAPI application factory, lifespan management, structured JSON logging, central RFC-compliant exception handling, TimescaleDB / PostgreSQL persistence, Alembic migrations, and React strict mode shell.
 - **Phase 2 (Market Data Subsystem)**: Binance Spot public market data adapter, historical REST OHLCV ingestion (1m, 5m, 15m), live WebSocket streaming with automatic reconnects and exponential backoff jitter, strict price/volume/timestamp integrity validation, separate exchange and ingestion UTC timestamps, open vs. finalized candle distinction, database constraints preventing duplicates, sequence gap detection, rate-limited REST backfills, restart recovery, and live telemetry endpoints.
 - **Phase 3 (Quantitative Strategies & Research Pipeline)**: Mathematical feature engineering pipeline (SMA, EMA, simple and logarithmic returns, rolling volatility, rolling z-score, ATR, volume statistics, multi-period momentum, and graceful order-book imbalance handling). Zero-lookahead bias enforcement and incomplete candle rejection. Typed non-executing strategy interface returning immutable auditable Signals. Three baseline long-only spot research strategies (Trend Following, Mean Reversion, Volatility-Normalized Momentum with transaction cost hurdles). Cryptographic dataset fingerprinting (SHA-256) and persistent experiment ledger tracking (`strategy_experiments` and `strategy_signals`).
+- **Phase 4 (Deterministic Historical Backtesting Engine)**: Event-driven historical simulation engine with chronological event loop. Strict next-bar Open execution model preventing look-ahead fill bias. Explicit cost separation (Gross P&L, Maker/Taker fees, adverse slippage penalty, Net P&L). Strict portfolio ledger invariants ($\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$, $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$). Liquidity participation constraints (capped at $10\%$ of bar volume). Comprehensive validation framework: chronological train/validation/untouched holdout splits, rolling walk-forward evaluation, 4-regime classification (Bullish, Bearish, Choppy, High Volatility), passive buy-and-hold benchmark, no-trade baseline, and multi-scenario cost/latency stress testing (2x/5x fees, 3x slippage, severe stress, delayed execution by 1 bar). High-precision analytics (Sharpe, Sortino, max drawdown, win rate, profit factor, expectancy, turnover, exposure, cost drag, 95% bootstrap confidence intervals) persisted in TimescaleDB/PostgreSQL (`backtest_runs` & `backtest_trades`) and exposed via REST APIs and an institutional React frontend.
 
 ---
 
@@ -36,12 +37,25 @@ Alpha Quant/
 │   │   │   │   │   ├── health.py        # /api/v1/health & /readiness
 │   │   │   │   │   ├── system.py        # /api/v1/system/status & audit-logs
 │   │   │   │   │   ├── market.py        # /api/v1/market/candles, /status, /backfill
-│   │   │   │   │   └── strategies.py    # /api/v1/strategies, /run, /experiments
+│   │   │   │   │   ├── strategies.py    # /api/v1/strategies, /run, /experiments
+│   │   │   │   │   └── backtest.py      # /api/v1/backtests & /analytics/performance
 │   │   │   │   └── router.py            # Central v1 routing table
 │   │   │   └── deps.py                  # Database session dependency injection
+│   │   ├── backtest/                    # Event-driven backtesting & simulation engine
+│   │   │   ├── accounting.py            # Fixed-precision portfolio ledger & invariants
+│   │   │   ├── analytics.py             # Sharpe, Sortino, Drawdown & bootstrap CIs
+│   │   │   ├── constants.py             # Annualization constants, fees, benchmarks
+│   │   │   ├── cost_model.py            # Adverse slippage, fee schedules & liquidity caps
+│   │   │   ├── engine.py                # Chronological event loop & stress runner
+│   │   │   ├── exceptions.py            # Backtest domain exceptions
+│   │   │   ├── execution.py             # Next-bar Open fills & limit order simulation
+│   │   │   ├── schemas.py               # Pydantic schemas for backtest runs & trades
+│   │   │   ├── service.py               # Backtest persistence & analytics service
+│   │   │   └── validation.py            # Chronological splits, holdout & walk-forward generator
 │   │   ├── cli/
 │   │   │   ├── ingest.py                # Public market data historical ingestion CLI
-│   │   │   └── run_strategy.py          # Strategy experiment execution & signal generation CLI
+│   │   │   ├── run_strategy.py          # Strategy experiment execution & signal generation CLI
+│   │   │   └── run_backtest.py          # Event-driven historical backtesting CLI
 │   │   ├── core/
 │   │   │   ├── config.py                # Pydantic Settings & environment validation
 │   │   │   ├── exceptions.py            # Central domain exceptions
@@ -89,6 +103,7 @@ Alpha Quant/
 │   │   │   ├── base.py                  # Model registry
 │   │   │   ├── market.py                # TimescaleDB MarketCandle model
 │   │   │   ├── strategy.py              # StrategyExperiment & StrategySignal models
+│   │   │   ├── backtest.py              # BacktestRun & BacktestTradeLog models
 │   │   │   └── system.py                # SystemAuditLog model
 │   │   ├── schemas/
 │   │   │   └── health.py                # Health & readiness validation schemas
@@ -97,7 +112,8 @@ Alpha Quant/
 │   │   ├── versions/
 │   │   │   ├── 0001_initial_schema.py   # Baseline system audit schema
 │   │   │   ├── 0002_market_candles_schema.py # TimescaleDB hypertable candles schema
-│   │   │   └── 0003_strategy_experiments_schema.py # Experiment ledger & signals schema
+│   │   │   ├── 0003_strategy_experiments_schema.py # Experiment ledger & signals schema
+│   │   │   └── 0004_backtest_schema.py  # Backtest runs & trades persistent schema
 │   │   ├── env.py                       # Alembic migration runner
 │   │   └── script.py.mako
 │   ├── tests/
@@ -114,6 +130,9 @@ Alpha Quant/
 │   │   ├── test_quant_api.py            # Quantitative strategy endpoints tests
 │   │   ├── test_quant_features.py       # Mathematical feature formulas & lookahead prevention
 │   │   ├── test_quant_strategies.py     # Deterministic signal generation & reproducibility
+│   │   ├── test_backtest_execution.py   # Event-driven next-bar fills, fees & slippage tests
+│   │   ├── test_backtest_validation.py  # Splits, holdouts, walk-forward & regimes tests
+│   │   ├── test_backtest_api.py         # Backtest simulation & performance REST API tests
 │   │   └── test_system.py               # Status diagnostics & honest empty state tests
 │   ├── alembic.ini                      # Migration configuration
 │   ├── Dockerfile                       # Multi-stage production container spec
@@ -137,14 +156,15 @@ Alpha Quant/
     │   │   ├── DashboardPage.tsx        # System overview & infrastructure status
     │   │   ├── MarketDataPage.tsx       # Live market feed & historical candles explorer
     │   │   ├── PortfolioPage.tsx        # Portfolio empty state (Phase 2 preview)
-    │   │   ├── StrategiesPage.tsx       # Strategies empty state (Phase 3 preview)
+    │   │   ├── StrategiesPage.tsx       # Quantitative strategies & experiment ledger
+    │   │   ├── BacktestPage.tsx         # Historical backtest engine & stress test UI
     │   │   ├── SystemHealthPage.tsx     # Real-time health diagnostic dashboard
     │   │   └── NotFoundPage.tsx         # 404 handler
     │   ├── services/
     │   │   └── api.ts                   # Typed API service client
     │   ├── types/
     │   │   └── index.ts                 # Strict TypeScript interface contracts
-    │   ├── App.tsx                      # Client router with /market-data
+    │   ├── App.tsx                      # Client router with /market-data & /backtests
     │   ├── index.css                    # Tailwind directives and custom scrollbars
     │   └── main.tsx                     # React DOM entry
     ├── Dockerfile                       # Production Nginx container
@@ -265,10 +285,29 @@ cd backend
 
 ---
 
+## 📈 Event-Driven Backtesting Simulation CLI
+
+ALPHA Quant provides a high-fidelity event-driven historical simulation CLI with configurable capital, maker/taker fee schedules, adverse slippage penalties, liquidity limits, and automated stress testing:
+
+```powershell
+cd backend
+# Run Trend Following backtest with default cost schedule and stress tests:
+$env:DATABASE_URL="sqlite+aiosqlite:///alpha_quant.db"
+.venv\Scripts\python app\cli\run_backtest.py --strategy trend_following --symbol BTCUSDT --interval 1m
+
+# Run Mean Reversion backtest with custom fee schedules and slippage:
+.venv\Scripts\python app\cli\run_backtest.py --strategy mean_reversion --symbol BTCUSDT --interval 1m --initial-cash 25000 --taker-fee-bps 7.5 --slippage-bps 4.0
+
+# Run Momentum backtest and export detailed JSON execution report:
+.venv\Scripts\python app\cli\run_backtest.py --strategy momentum --symbol BTCUSDT --interval 1m --output-json backtest_results.json
+```
+
+---
+
 ## 🧪 Verification & Testing Commands
 
 ### Backend Automated Test Suite
-Run all 63 automated tests (feature formulas, warm-up periods, timestamp alignment, look-ahead bias prevention, baseline strategies, reproducibility, REST/WS mocks, database upserts, and API endpoints):
+Run all 75 automated tests (event-driven next-bar fills, adverse slippage, ledger invariants, liquidity constraints, train/validation/holdout splits, walk-forward generator, market regimes, feature formulas, look-ahead prevention, strategies, REST/WS adapters, database idempotency, and API endpoints):
 ```powershell
 cd backend
 .venv\Scripts\pytest -v
@@ -305,21 +344,33 @@ npm run build
 | `POST` | `/api/v1/strategies/run` | Execute Experiment | Evaluates strategy on stored candles, computes features, and persists signals. |
 | `GET` | `/api/v1/strategies/experiments` | Experiment Ledger | Queries historical recorded experiments with dataset fingerprints. |
 | `GET` | `/api/v1/strategies/experiments/{id}` | Experiment Details | Returns complete experiment metadata and individual auditable signals. |
+| `POST` | `/api/v1/backtests` | Launch Backtest | Runs deterministic event-driven backtest, computes metrics & stress tests. |
+| `GET` | `/api/v1/backtests` | List Backtests | Queries historical backtest runs filtered by strategy or symbol. |
+| `GET` | `/api/v1/backtests/{id}` | Backtest Details | Returns full equity curve snapshots, fill logs, and stress scenario results. |
+| `GET` | `/api/v1/analytics/performance` | Performance Analytics | Computes aggregated Sharpe, Drawdown, and return metrics across backtests. |
 
 ---
 
-## 🛡️ Phase 3 Acceptance Criteria Checklist
+## 🛡️ Phase 4 Acceptance Criteria Checklist
 
-- [x] **Feature engineering pipeline**: Implemented tested functions for SMA, EMA, simple and logarithmic returns, rolling volatility, rolling z-scores, ATR, volume statistics, multi-period momentum, and graceful order-book imbalance handling.
-- [x] **Explicit formulas, lookback & warm-up documentation**: Every feature documents its exact formula, lookback, warm-up period, and timestamp alignment in docstrings and registry metadata.
-- [x] **Zero look-ahead bias enforcement**: Look-ahead prevention test mathematically proves that mutating future observations does not alter features or signals at time $t$.
-- [x] **Incomplete candle rejection**: Open candles (`is_closed=False`) are strictly filtered/rejected so unfinalized observations never pollute historical features.
-- [x] **Common typed Strategy interface**: Returns immutable, auditable `Signal` containing `strategy_id`, `version`, `decision_timestamp`, `symbol`, `side` (buy/sell/hold), `signal_score`, `reference_price`, `reason`, `relevant_features`, and `config_id`.
-- [x] **Strict zero-execution guarantee**: Strategies generate mathematical decision signals and never place orders or modify balances.
-- [x] **Three baseline strategies**:
-  - **Trend following**: Candidate moving average windows (20, 100), volatility filter, and explicit exit conditions.
-  - **Mean reversion**: Candidate 60-candle lookback, absolute z-score threshold (2.0), regime filter, and explicit exits.
-  - **Momentum**: Configurable multi-period returns, volatility normalization, and transaction cost hurdle verification.
-- [x] **Cryptographic experiment tracking**: Persists strategy version, parameters, dataset SHA-256 fingerprint, time range, feature definitions, and signal timestamps in `strategy_experiments` and `strategy_signals`.
-- [x] **Auditable and reproducible**: Outputs can be reproduced identically on real stored data and deterministic synthetic fixtures.
-- [x] **All tests pass**: 63/63 automated backend tests pass, frontend strict typecheck passes, production build succeeds.
+- [x] **Event-driven execution model**: Chronological bar processing, strictly executing market orders at bar $t+1$ Open with documented adverse fill rules.
+- [x] **Zero future leakage**: Historical fills never use future prices or intrabar peaks to improve execution.
+- [x] **Separated financial cost accounting**: Tracks Gross P&L, Maker/Taker fees, adverse slippage drag, and Net P&L independently.
+- [x] **Portfolio ledger invariants**: Fixed-precision accounting rigorously guarantees $\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$ and $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$ at every timestamp.
+- [x] **Liquidity constraints**: Maximum candle volume participation cap ($10\%$) enforced; cash overdrafts prevented.
+- [x] **Comprehensive validation**:
+  - Chronological train/validation/untouched holdout splits preventing data snooping.
+  - Rolling walk-forward evaluation generator.
+  - Passive Buy-and-Hold benchmark and No-Trade baseline for comparative attribution.
+  - Market regime decomposition (Bullish, Bearish, Choppy, High Volatility).
+- [x] **Cost and latency stress testing**:
+  - High fee stress (2x and 5x fee schedule).
+  - High slippage stress (3x adverse slippage).
+  - Severe combined stress.
+  - 1-bar execution delay latency simulation.
+- [x] **Institutional performance analytics**: Net return %, annualized Sharpe ratio ($525,600$ min/year for 24/7/365 crypto, $r_f=0.0\%$), Sortino ratio, max drawdown %, profit factor, win rate %, expectancy, turnover, market exposure %, fee/slippage drag, and 95% bootstrap confidence intervals.
+- [x] **Database persistence & fingerprinting**: `backtest_runs` and `backtest_trades` tables storing complete execution history, dataset SHA-256 fingerprint, parameters, and equity curves.
+- [x] **REST API endpoints**: `POST /api/v1/backtests`, `GET /api/v1/backtests/{run_id}`, and `GET /api/v1/analytics/performance`.
+- [x] **React + TypeScript frontend**: Branded dark/gold institutional Backtesting Engine page (`/backtests`) with interactive simulation launcher, metric cards, equity curves, stress test cards, and simulated trade logs.
+- [x] **All tests pass**: 75/75 automated backend tests pass, frontend strict TypeScript compiles cleanly, production bundle compiles in 2.37s.
+

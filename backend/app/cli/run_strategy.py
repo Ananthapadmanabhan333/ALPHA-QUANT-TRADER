@@ -1,7 +1,14 @@
 import argparse
 import asyncio
 import json
+from pathlib import Path
 import sys
+
+# Ensure backend root is on sys.path
+backend_dir = Path(__file__).resolve().parent.parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from app.db.session import get_session_factory, close_database_connection
 from app.market.service import MarketDataService
 from app.quant.constants import (
