@@ -474,4 +474,44 @@ npm run build
   - All 108 backend tests passing.
   - Zero live trading order execution routes or stored credentials.
 
+---
+
+## 🚀 Phase 8: Final Validation, Deployment & Acceptance Checklist
+
+- [x] **Full-System Verification**:
+  - Validated end-to-end pipeline: Market Data &rarr; Validation &rarr; TimescaleDB &rarr; Feature Pipeline &rarr; Strategy Signal &rarr; Central Risk Gate &rarr; PaperBroker &rarr; Fills &rarr; Accounting Ledger &rarr; Analytics &rarr; REST & WebSocket Dashboard.
+  - Formally documented in [`final_acceptance_report.md`](file:///c:/Users/Ananthapadmanabhan/.gemini/antigravity/brain/a8fbdccc-a088-46ea-b92a-bb0f0783f59c/final_acceptance_report.md).
+- [x] **Comprehensive Failure Mode Simulations**:
+  - Validated 12 failure vectors in [`test_failure_simulations.py`](file:///c:/Users/Ananthapadmanabhan/Desktop/Projects/Alpha%20Quant/backend/tests/test_failure_simulations.py): feed disconnection, sequence gaps, stale prices, database outage, application restart, duplicate order submission, duplicate fill processing, insufficient cash balance, circuit-breaker activation, invalid API input, unauthorized mutations, and interrupted backtests.
+- [x] **Security Audit & Invariants**:
+  - Verified zero live trading clients, zero withdrawal endpoints, zero committed secrets, server-side risk gate enforcement, and non-root minimal container images in [`test_security_audit.py`](file:///c:/Users/Ananthapadmanabhan/Desktop/Projects/Alpha%20Quant/backend/tests/test_security_audit.py).
+- [x] **Multi-Container Deployment & CI**:
+  - Finalized `docker-compose.yml` for TimescaleDB (pg16), FastAPI Backend, and Nginx React Frontend with WebSocket reverse proxying.
+  - Created GitHub Actions CI pipeline in [`.github/workflows/ci.yml`](file:///c:/Users/Ananthapadmanabhan/Desktop/Projects/Alpha%20Quant/.github/workflows/ci.yml).
+- [x] **Empirical Evaluation Report**:
+  - Formally generated in [`evaluation_report.md`](file:///c:/Users/Ananthapadmanabhan/.gemini/antigravity/brain/a8fbdccc-a088-46ea-b92a-bb0f0783f59c/evaluation_report.md) with dataset provenance, strategy parameters, cost sensitivity, walk-forward splits, benchmark comparisons, and research conclusions without statistical fabrication.
+- [x] **Paper-Trading-Only Guarantee**:
+  - Strictly **₹0 real capital**. Live trading integrations prohibited.
+
+---
+
+## 🛠️ Operations Runbook: Backup, Recovery & Troubleshooting
+
+### 1. Database Backup & Restore
+```bash
+# Backup TimescaleDB database into compressed dump
+docker compose exec timescaledb pg_dump -U postgres -d alpha_quant -Fc > alpha_quant_backup.dump
+
+# Restore database from dump
+docker compose exec -T timescaledb pg_restore -U postgres -d alpha_quant --clean < alpha_quant_backup.dump
+```
+
+### 2. Operational Troubleshooting Guide
+| Symptom | Diagnostic Step | Resolution |
+|---|---|---|
+| `/ready` returns HTTP 503 `not_ready` | Check `curl http://localhost:8000/ready` components | Ensure TimescaleDB is healthy (`docker compose ps`) and market feed has received an exchange tick within 120s. |
+| Orders rejected with `EMERGENCY_STOP_ENGAGED` | Check `/risk` console or `GET /api/v1/risk/status` | Trip caused by peak drawdown or manual halt. Use Risk Console with `CONFIRM_RESET` token to clear. |
+| Ingestion rate limit exceeded | Check `rate_limit_remaining` in `/api/v1/market/status` | Wait for 60s sliding window reset. Ingestion engine enforces exponential backoff automatically. |
+| WebSocket live stream disconnects | Inspect browser DevTools Network tab | Verify Nginx reverse proxy `proxy_set_header Upgrade $http_upgrade` is active; auto-reconnects with exponential jitter. |
+
 
