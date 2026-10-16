@@ -1,5 +1,5 @@
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Optional, Union
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.backtest.schemas import (
@@ -11,9 +11,12 @@ from app.backtest.schemas import (
     TradeResponseSchema,
 )
 from app.backtest.service import BacktestService
-from app.db.session import get_db
+from app.core.security import verify_admin_key
+from app.db.session import get_db, get_session_factory
+from app.orchestration.tasks import get_task_manager
 from app.quant.constants import SUPPORTED_STRATEGIES
 from app.quant.exceptions import InsufficientDataException, QuantException
+from app.schemas.orchestration import AsyncTaskResponse
 
 router = APIRouter()
 backtest_service = BacktestService()
@@ -21,13 +24,16 @@ backtest_service = BacktestService()
 
 @router.post(
     "/backtests",
-    response_model=BacktestRunResponse,
+    response_model=Union[BacktestRunResponse, AsyncTaskResponse],
     status_code=status.HTTP_201_CREATED,
     summary="Execute and persist event-driven backtest simulation",
 )
 async def create_backtest_run(
     payload: BacktestCreateRequest,
+    response: Response,
+    async_mode: bool = Query(False, description="Execute asynchronously in background worker"),
     db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
 ):
     """
     Executes a deterministic event-driven backtest over historical candles.
@@ -39,6 +45,32 @@ async def create_backtest_run(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported strategy '{payload.strategy_id}'. Supported: {SUPPORTED_STRATEGIES}",
         )
+
+    if async_mode:
+        task_manager = get_task_manager()
+        session_factory = get_session_factory()
+
+        async def _run_async_backtest():
+            async with session_factory() as async_session:
+                run_rec, res = await backtest_service.execute_and_persist_backtest(
+                    db=async_session,
+                    request=payload,
+                )
+                return {
+                    "run_id": run_rec.id,
+                    "strategy_id": run_rec.strategy_id,
+                    "net_return_pct": run_rec.net_return_pct,
+                    "sharpe_ratio": run_rec.sharpe_ratio,
+                    "total_trades": run_rec.total_trades,
+                }
+
+        task_record = task_manager.enqueue_task(
+            task_type="BACKTEST_SIMULATION",
+            coro_fn=_run_async_backtest,
+            metadata={"strategy_id": payload.strategy_id, "symbol": payload.symbol},
+        )
+        response.status_code = status.HTTP_202_ACCEPTED
+        return AsyncTaskResponse(**task_record.to_dict())
 
     try:
         run_record, result = await backtest_service.execute_and_persist_backtest(

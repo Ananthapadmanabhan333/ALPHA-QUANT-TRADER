@@ -24,11 +24,18 @@ async def liveness(settings: Settings = Depends(get_settings)) -> HealthResponse
     return await health_liveness(settings=settings)
 
 
+from app.market.service import MarketDataService
+
+market_service = MarketDataService()
+
+
 @router.get("/readiness", response_model=ReadinessResponse, summary="Readiness Probe")
 async def health_readiness(response: Response) -> ReadinessResponse:
-    """Readiness probe: validates database connectivity before accepting user traffic."""
+    """Readiness probe: validates database and market data connectivity before accepting user traffic."""
     db_result = await check_database_connection()
-    is_ready = db_result["connected"]
+    market_result = await market_service.check_market_data_dependency()
+
+    is_ready = bool(db_result.get("connected") and market_result.get("connected"))
 
     if not is_ready:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -39,5 +46,6 @@ async def health_readiness(response: Response) -> ReadinessResponse:
         timestamp=datetime.now(timezone.utc),
         components={
             "database": db_result,
+            "market_data": market_result,
         },
     )

@@ -149,6 +149,33 @@ class FeaturePipeline:
 
         return df
 
+    def compute_features(
+        self,
+        candles: List[Union[MarketCandle, Dict[str, Any]]],
+        interval: Optional[str] = None,
+        sma_windows: List[int] = (20, 100),
+        ema_windows: List[int] = (20, 100),
+        volatility_windows: List[int] = (20,),
+        zscore_windows: List[int] = (60,),
+        atr_windows: List[int] = (14,),
+        volume_windows: List[int] = (20,),
+        momentum_periods: List[int] = (5, 15, 60),
+    ) -> pd.DataFrame:
+        """
+        Transforms raw candle models or dictionaries into DataFrame and computes all quantitative features.
+        """
+        df = self.candles_to_dataframe(candles, interval=interval)
+        return self.compute_all_features(
+            df=df,
+            sma_windows=sma_windows,
+            ema_windows=ema_windows,
+            volatility_windows=volatility_windows,
+            zscore_windows=zscore_windows,
+            atr_windows=atr_windows,
+            volume_windows=volume_windows,
+            momentum_periods=momentum_periods,
+        )
+
     def compute_all_features(
         self,
         df: pd.DataFrame,

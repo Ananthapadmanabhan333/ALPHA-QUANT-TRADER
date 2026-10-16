@@ -7,6 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import verify_admin_key
 from app.db.session import get_db
 from app.paper.exceptions import (
     DuplicateOrderException,
@@ -64,6 +65,7 @@ async def get_paper_account(
 async def submit_paper_order(
     payload: PaperOrderCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
 ):
     """
     Submits a simulated market or limit order.
@@ -133,6 +135,7 @@ async def get_paper_order(
 async def cancel_paper_order(
     order_id: str,
     db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
 ):
     try:
         return await paper_service.cancel_paper_order(db, order_id)
@@ -176,6 +179,7 @@ async def get_risk_status(
 async def trigger_emergency_stop(
     payload: EmergencyStopRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
 ):
     """
     Halts all simulated entry orders immediately. Persists critical risk event.
@@ -191,6 +195,7 @@ async def trigger_emergency_stop(
 async def resume_emergency_stop(
     payload: EmergencyResumeRequest,
     db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
 ):
     """
     Clears emergency pause following explicit confirmation token 'CONFIRM_RESUME'.

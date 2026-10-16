@@ -26,6 +26,8 @@ def test_settings() -> Settings:
         DATABASE_SYNC_URL="sqlite:///:memory:",
         LOG_LEVEL="DEBUG",
         LOG_FORMAT="text",
+        ADMIN_API_KEY="alpha-quant-test-key",
+        REQUIRE_AUTH=False,
     )
 
 

@@ -1,6 +1,6 @@
 # ALPHA Quant — Institutional Trading Platform
 
-[![Phase](https://img.shields.io/badge/Phase-5%3A%20Paper%20Execution%20%26%20Risk-gold.svg)](#)
+[![Phase](https://img.shields.io/badge/Phase-6%3A%20API%20%26%20Orchestration-gold.svg)](#)
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](#)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-emerald.svg)](#)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](#)
@@ -19,6 +19,7 @@
 - **Phase 3 (Quantitative Strategies & Research Pipeline)**: Mathematical feature engineering pipeline (SMA, EMA, simple and logarithmic returns, rolling volatility, rolling z-score, ATR, volume statistics, multi-period momentum, and graceful order-book imbalance handling). Zero-lookahead bias enforcement and incomplete candle rejection. Typed non-executing strategy interface returning immutable auditable Signals. Three baseline long-only spot research strategies (Trend Following, Mean Reversion, Volatility-Normalized Momentum with transaction cost hurdles). Cryptographic dataset fingerprinting (SHA-256) and persistent experiment ledger tracking (`strategy_experiments` and `strategy_signals`).
 - **Phase 4 (Deterministic Historical Backtesting Engine)**: Event-driven historical simulation engine with chronological event loop. Strict next-bar Open execution model preventing look-ahead fill bias. Explicit cost separation (Gross P&L, Maker/Taker fees, adverse slippage penalty, Net P&L). Strict portfolio ledger invariants ($\text{Equity}_t = \text{Cash}_t + \sum \text{PositionValue}_t$, $\Delta\text{Equity} = \text{GrossPnL} - \text{Fees} - \text{Slippage}$). Liquidity participation constraints (capped at $10\%$ of bar volume). Comprehensive validation framework: chronological train/validation/untouched holdout splits, rolling walk-forward evaluation, 4-regime classification (Bullish, Bearish, Choppy, High Volatility), passive buy-and-hold benchmark, no-trade baseline, and multi-scenario cost/latency stress testing (2x/5x fees, 3x slippage, severe stress, delayed execution by 1 bar). High-precision analytics persisted in TimescaleDB/PostgreSQL (`backtest_runs` & `backtest_trades`) and exposed via REST APIs and an institutional React frontend.
 - **Phase 5 (Paper Execution & Central Risk Subsystem)**: Dedicated PaperBroker simulating spot execution without live trading capabilities. Strict pre-trade Central Risk Gate enforcing maximum order notional ($10,000), position concentration (10% of equity), aggregate exposure (80%), daily loss limits (2%), peak-to-trough drawdown limits (5%), consecutive loss streak halts, data-freshness guards (max 300s feed age), and spread/liquidity filters. Transactional atomicity for orders, fills, positions, and balance mutations with idempotent submissions (`client_order_id`). Emergency Stop kill switch with strict non-resetting restart recovery, operational ledger reconciliation, and institutional React control console (`/portfolio`).
+- **Phase 6 (API & Lifecycle Orchestration)**: Enterprise lifecycle manager coordinating the complete 9-stage quantitative pipeline: (1) market data health, (2) feature pipeline readiness, (3) strategy scheduling, (4) signal validation, (5) Central Risk Gate, (6) paper order submission, (7) fill processing, (8) portfolio updates, and (9) event persistence. Explicit task ownership preventing duplicate scheduler executions with HTTP 409 conflict detection. Asynchronous background task queue for long-running backtests and heavy jobs. Real-time WebSocket telemetry streaming (`/api/v1/ws/live`) with handshake snapshots, ping/pong heartbeats, and REST fallback (`/api/v1/live/fallback`). Mandatory multi-dependency operational readiness probes (`/ready` requires both healthy database and responsive market data feed). Administrative authentication and authorization protecting mutating operations (`ADMIN_API_KEY`), and unified paginated REST endpoints (`/portfolio`, `/orders`, `/fills`, `/events`, `/risk/status`, `/paper-trading/*`, `/risk/reset`).
 
 
 ---
@@ -384,51 +385,65 @@ npm run build
 | `POST` | `/api/v1/strategies/run` | Execute Experiment | Evaluates strategy on stored candles, computes features, and persists signals. |
 | `GET` | `/api/v1/strategies/experiments` | Experiment Ledger | Queries historical recorded experiments with dataset fingerprints. |
 | `GET` | `/api/v1/strategies/experiments/{id}` | Experiment Details | Returns complete experiment metadata and individual auditable signals. |
-| `POST` | `/api/v1/backtests` | Launch Backtest | Runs deterministic event-driven backtest, computes metrics & stress tests. |
+| `POST` | `/api/v1/backtests` | Launch Backtest | Runs deterministic event-driven backtest; supports `?async_mode=true` queue. (Protected) |
 | `GET` | `/api/v1/backtests` | List Backtests | Queries historical backtest runs filtered by strategy or symbol. |
 | `GET` | `/api/v1/backtests/{id}` | Backtest Details | Returns full equity curve snapshots, fill logs, and stress scenario results. |
 | `GET` | `/api/v1/analytics/performance` | Performance Analytics | Computes aggregated Sharpe, Drawdown, and return metrics across backtests. |
-| `GET` | `/api/v1/paper/account` | Paper Account Overview | Returns virtual cash, positions, cost basis, and realized/unrealized P&L. |
-| `POST` | `/api/v1/paper/orders` | Submit Paper Order | Validates via Central Risk Gate and executes simulated order. |
-| `GET` | `/api/v1/paper/orders` | List Paper Orders | Queries historical simulated orders and filter by status. |
-| `GET` | `/api/v1/paper/orders/{id}` | Order Fills Details | Returns execution fills, fees, and slippage cost breakdown for an order. |
-| `DELETE` | `/api/v1/paper/orders/{id}` | Cancel Paper Order | Cancels an open or partially filled simulated limit order. |
-| `GET` | `/api/v1/paper/positions` | List Positions | Returns current simulated spot holdings valued at mark price. |
-| `GET` | `/api/v1/paper/risk/status` | Risk Gate Status | Live telemetry for drawdown, daily P&L, feed health, and emergency stop. |
-| `POST` | `/api/v1/paper/risk/emergency-stop` | Emergency Stop | Halts all simulated entry orders immediately. |
-| `POST` | `/api/v1/paper/risk/resume` | Resume Trading | Clears emergency halt with explicit confirmation token `CONFIRM_RESUME`. |
-| `POST` | `/api/v1/paper/match-market` | Match Intrabar Price | Evaluates and fills resting limit orders against market price tick. |
+| `GET` | `/api/v1/portfolio` | Unified Portfolio Overview | Virtual cash balance, positions, cost basis, exposure %, and P&L. |
+| `GET` | `/api/v1/orders` | Paginated Orders Ledger | Paginated orders with status, symbol, side, limit, and offset filtering. |
+| `GET` | `/api/v1/fills` | Paginated Fills Ledger | Paginated execution fills with prices, adverse slippage, and fee breakdowns. |
+| `GET` | `/api/v1/risk/status` | Central Risk Gate Telemetry | Live telemetry for drawdown, daily loss limit, feed health, and emergency stop. |
+| `GET` | `/api/v1/events` | Paginated System Events | Paginated audit trail of risk breaches, emergency pauses, and lifecycle transitions. |
+| `POST` | `/api/v1/paper-trading/start` | Start Paper Trading | Initiates automated 9-stage lifecycle scheduler loop with task ownership. (Protected) |
+| `POST` | `/api/v1/paper-trading/stop` | Stop Paper Trading | Gracefully halts automated paper loop and drains running tasks. (Protected) |
+| `GET` | `/api/v1/paper-trading/status` | Orchestrator Telemetry | Operational stats: status, task ID, worker ID, cycles, signals, and orders. |
+| `POST` | `/api/v1/risk/reset` | Operator Risk Reset | Authorizes reset of tripped controls using confirmation token `CONFIRM_RESET`. (Protected) |
+| `GET` | `/api/v1/tasks/{task_id}` | Background Task Status | Queries status and result of asynchronous background backtest simulations. |
+| `WS` | `/api/v1/ws/live` | WebSocket Live Stream | Real-time telemetry feed delivering snapshots, ticks, cycle logs, and alerts. |
+| `GET` | `/api/v1/live/fallback` | Live REST Fallback | Polling fallback for clients unable to maintain persistent WebSocket streams. |
 
 ---
 
-## 🛡️ Phase 5 Acceptance Criteria Checklist
+## 🛡️ Phase 6 Acceptance Criteria Checklist
 
-- [x] **Dedicated PaperBroker**: Supports virtual USDT balance ($10,000 default), simulated spot inventory, market & limit orders, order cancellation, configurable fees (8 bps maker / 10 bps taker) and adverse slippage (5 bps).
-- [x] **Strict balance & inventory accounting**: Rejects orders when cash or spot inventory is insufficient. Strategies cannot mutate account balances directly.
-- [x] **Partial fills supported**: Orders exceeding the maximum liquidity participation cap (10% of bar volume) are partially filled.
-- [x] **Central Risk Gate**: Every candidate order must pass the backend risk gate before execution:
-  - Maximum order notional limit ($10,000 USD default).
-  - Maximum single position concentration limit (10% of virtual equity).
-  - Maximum aggregate portfolio exposure limit (80% of virtual equity).
-  - Daily loss threshold (2% of starting daily equity, resets at 00:00 UTC).
-  - Peak-to-trough drawdown threshold (5% peak equity loss triggers halt).
-  - Consecutive loss streak threshold (3 consecutive loss trades blocks entries).
-  - Market data freshness guard (candles older than 300s reject new entries).
-  - Spread filter (spreads > 50 bps rejected).
-  - Invalid price and non-positive quantity rejection.
-  - Emergency Pause / Kill switch blocking all entry orders.
-- [x] **Transactional atomicity**: All related fills, fees, positions, and balance mutations execute within an atomic database transaction. Retried events do not create duplicate fills.
-- [x] **Strict Safety Invariants**:
-  - The application cannot submit real exchange orders.
-  - The broker accepts only simulated execution.
-  - No exchange trading credentials (API keys / secrets) are stored.
-  - Live trading configurations (`is_live=True`) are strictly rejected.
-  - No frontend action bypasses the backend risk gate.
-  - Portfolio state is derived from persisted ledger events.
-  - Risk limits and controls are never silently reset after a system restart.
-- [x] **Database persistence & migration**: Tables `paper_accounts`, `paper_orders`, `paper_fills`, `paper_positions`, `paper_risk_state`, and `paper_risk_events` applied cleanly via Alembic migration `0005_paper_execution_schema.py`.
-- [x] **REST API endpoints**: Complete `/api/v1/paper` routing suite for accounts, orders, positions, and risk control.
-- [x] **React + TypeScript frontend**: Upgraded `/portfolio` into a comprehensive Institutional Paper Trading & Risk Operations console with live order entry, positions table, order history, and emergency halt controls.
-- [x] **All tests pass**: 94/94 automated backend tests pass, frontend strict TypeScript compiles cleanly, production bundle compiles in 1.84s.
+- [x] **API Endpoints Finalized**:
+  - `GET /health` and `/ready` with multi-dependency validation.
+  - `GET /api/v1/market/candles` and `GET /api/v1/market/status`.
+  - `GET /api/v1/strategies`.
+  - `POST /api/v1/backtests` (sync and background async modes) and `GET /api/v1/backtests/{run_id}`.
+  - `GET /api/v1/portfolio` (unified simulated portfolio overview).
+  - `GET /api/v1/orders` (paginated simulated orders ledger).
+  - `GET /api/v1/fills` (paginated simulated fills ledger).
+  - `GET /api/v1/analytics/performance` (aggregated performance metrics).
+  - `GET /api/v1/risk/status` (Central Risk Gate telemetry and thresholds).
+  - `GET /api/v1/events` (paginated system and risk audit log).
+  - `POST /api/v1/paper-trading/start` and `POST /api/v1/paper-trading/stop` (orchestrator lifecycle controls).
+  - `POST /api/v1/risk/reset` (operator authorized risk control reset).
+- [x] **Authentication & Authorization**:
+  - Mutating operations (`POST /backtests`, `/paper-trading/start`, `/paper-trading/stop`, `/risk/reset`, `/paper/orders`, `/paper/risk/*`) protected by `verify_admin_key`.
+  - Supports `X-API-Key` header and `Authorization: Bearer <token>`.
+  - Rejects unauthenticated/unauthorized mutating requests with HTTP 401.
+- [x] **9-Stage Orchestration Lifecycle Manager**:
+  - Coordinates (1) market data health, (2) feature readiness, (3) strategy scheduling, (4) signal validation, (5) risk checks, (6) paper order submission, (7) fill processing, (8) portfolio updates, and (9) event persistence.
+  - Explicit task ownership with unique `worker_id` and `task_id`.
+  - Duplicate scheduler prevention returning HTTP 409 Conflict.
+- [x] **Background Task Queue**:
+  - `BackgroundTaskManager` executes long-running backtest simulations asynchronously (`?async_mode=true`).
+  - Queryable via `GET /api/v1/tasks/{task_id}` with status and progress tracking.
+- [x] **Live Updates Streaming**:
+  - WebSocket streaming endpoint `/api/v1/ws/live` with handshake snapshot, ping/pong keepalives, and reconnection support.
+  - REST fallback `/api/v1/live/fallback` for clients without persistent socket support.
+- [x] **Operational Reliability**:
+  - Readiness probe `/ready` rejects traffic (HTTP 503 `not_ready`) if database OR market data feed is down.
+  - Graceful shutdown drains lifecycle tasks, closes live WebSockets, and releases database connections.
+  - Startup recovery preserves persisted risk controls across server restarts.
+- [x] **Strict Paper-Only Trading Guarantee**:
+  - Zero live exchange trading capabilities.
+  - Storage or request of exchange API credentials strictly prohibited.
+  - `is_live=True` rejected with 422 Unprocessable Entity.
+- [x] **All tests pass**:
+  - **108/108** automated unit, integration, and API tests pass in 13.33s.
+  - Frontend TypeScript compiles in strict mode with 0 errors.
+  - Frontend production build compiles in 1.95s.
 
 

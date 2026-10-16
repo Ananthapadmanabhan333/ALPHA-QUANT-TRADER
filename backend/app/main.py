@@ -15,7 +15,7 @@ logger = get_logger("app")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Lifespan context manager for startup validation and graceful shutdown."""
+    """Lifespan context manager for startup validation, recovery, and graceful shutdown."""
     setup_logging()
     settings: Settings = app.state.settings
     logger.info(
@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         debug=settings.DEBUG,
     )
 
-    # Startup validation: verify database availability
+    # 1. Startup validation: verify database availability
     db_health = await check_database_connection()
     if db_health.get("connected"):
         logger.info(
@@ -41,10 +41,56 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             error=db_health.get("error"),
         )
 
+    # 2. Startup validation: verify market data availability
+    from app.market.service import MarketDataService
+    market_service = MarketDataService()
+    market_health = await market_service.check_market_data_dependency()
+    logger.info(
+        "market_data_dependency_status",
+        status=market_health.get("status"),
+        connected=market_health.get("connected"),
+    )
+
+    # 3. Startup recovery: verify risk controls are intact and active
+    try:
+        from app.db.session import get_session_factory
+        from app.paper.broker import PaperBroker
+        session_factory = get_session_factory()
+        async with session_factory() as session:
+            broker = PaperBroker()
+            account = await broker.get_or_create_default_account(session)
+            risk_state = await broker.get_account_risk_state(session, account.id)
+            if risk_state and risk_state.emergency_stop:
+                logger.warning(
+                    "startup_recovery_emergency_stop_persisted",
+                    account_id=account.id,
+                    reason=risk_state.kill_switch_reason,
+                )
+    except Exception as exc:
+        logger.debug("startup_risk_recovery_skipped", detail=str(exc))
+
     yield
 
-    # Graceful shutdown: close open database pool connections
+    # Graceful shutdown:
     logger.info("alpha_quant_graceful_shutdown_starting")
+
+    # Stop paper trading orchestrator if running
+    try:
+        from app.orchestration.lifecycle import get_lifecycle_manager
+        manager = get_lifecycle_manager()
+        await manager.shutdown()
+    except Exception as exc:
+        logger.debug("graceful_shutdown_orchestrator_cleanup", detail=str(exc))
+
+    # Disconnect live websocket clients
+    try:
+        from app.orchestration.broadcaster import get_broadcaster
+        broadcaster = get_broadcaster()
+        await broadcaster.disconnect_all()
+    except Exception as exc:
+        logger.debug("graceful_shutdown_broadcaster_cleanup", detail=str(exc))
+
+    # Close open database pool connections
     await close_database_connection()
     logger.info("alpha_quant_graceful_shutdown_completed")
 
@@ -126,8 +172,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def root_ready(response: Response) -> ReadinessResponse:
         from datetime import datetime, timezone
         from fastapi import status as http_status
+        from app.market.service import MarketDataService
+
         db_result = await check_database_connection()
-        is_ready = db_result["connected"]
+        market_service = MarketDataService()
+        market_result = await market_service.check_market_data_dependency()
+
+        is_ready = bool(db_result.get("connected") and market_result.get("connected"))
         if not is_ready:
             response.status_code = http_status.HTTP_503_SERVICE_UNAVAILABLE
 
@@ -135,7 +186,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status="ready" if is_ready else "not_ready",
             ready=is_ready,
             timestamp=datetime.now(timezone.utc),
-            components={"database": db_result},
+            components={
+                "database": db_result,
+                "market_data": market_result,
+            },
         )
 
     @app.get("/", tags=["System"], summary="Root Information")

@@ -120,6 +120,13 @@ class PaperBroker:
         res = await db.execute(stmt)
         return res.scalars().first()
 
+    async def get_order_fills(self, db: AsyncSession, order_id: str) -> List[PaperFill]:
+        """
+        Retrieves all fill executions associated with an order ID.
+        """
+        stmt = select(PaperFill).where(PaperFill.order_id == order_id).order_by(PaperFill.created_at.asc())
+        return list((await db.execute(stmt)).scalars().all())
+
     async def submit_order(
         self,
         db: AsyncSession,

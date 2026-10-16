@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     MARKET_DATA_WS_INITIAL_BACKOFF_SECONDS: float = 1.0
     MARKET_DATA_WS_MAX_BACKOFF_SECONDS: float = 60.0
 
+    # Security & Administration
+    ADMIN_API_KEY: str = "alpha-quant-admin-secret"
+    REQUIRE_AUTH: bool = True
+
 
 @lru_cache()
 def get_settings() -> Settings:

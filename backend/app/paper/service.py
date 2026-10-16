@@ -5,7 +5,8 @@ Orchestrates PaperBroker, MarketData feeds, risk evaluations, and read queries.
 
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
-from sqlalchemy import select
+import uuid
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.market.service import MarketDataService
@@ -15,6 +16,7 @@ from app.models.paper import (
     PaperFill,
     PaperOrder,
     PaperPosition,
+    PaperRiskEvent,
     PaperRiskState,
 )
 from app.paper.broker import PaperBroker
@@ -339,3 +341,168 @@ class PaperService:
             created_at=order.created_at,
             updated_at=order.updated_at,
         )
+
+    async def list_orders_paginated(
+        self,
+        db: AsyncSession,
+        status: Optional[str] = None,
+        symbol: Optional[str] = None,
+        side: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[int, List[PaperOrderResponse]]:
+        """Returns total matching order count and paginated list of orders."""
+        query = select(PaperOrder)
+        count_query = select(func.count(PaperOrder.id))
+
+        if status:
+            query = query.where(PaperOrder.status == status.lower())
+            count_query = count_query.where(PaperOrder.status == status.lower())
+        if symbol:
+            norm_symbol = symbol.replace("/", "").upper()
+            query = query.where(PaperOrder.symbol == norm_symbol)
+            count_query = count_query.where(PaperOrder.symbol == norm_symbol)
+        if side:
+            query = query.where(PaperOrder.side == side.lower())
+            count_query = count_query.where(PaperOrder.side == side.lower())
+
+        total = (await db.execute(count_query)).scalar() or 0
+        stmt = query.order_by(PaperOrder.created_at.desc()).limit(limit).offset(offset)
+        orders = (await db.execute(stmt)).scalars().all()
+        return total, [self._to_order_response(o) for o in orders]
+
+    async def list_fills_paginated(
+        self,
+        db: AsyncSession,
+        symbol: Optional[str] = None,
+        side: Optional[str] = None,
+        order_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[int, List[PaperFillResponse]]:
+        """Returns total matching fill count and paginated list of fills."""
+        query = select(PaperFill)
+        count_query = select(func.count(PaperFill.id))
+
+        if symbol:
+            norm_symbol = symbol.replace("/", "").upper()
+            query = query.where(PaperFill.symbol == norm_symbol)
+            count_query = count_query.where(PaperFill.symbol == norm_symbol)
+        if side:
+            query = query.where(PaperFill.side == side.lower())
+            count_query = count_query.where(PaperFill.side == side.lower())
+        if order_id:
+            query = query.where(PaperFill.order_id == order_id)
+            count_query = count_query.where(PaperFill.order_id == order_id)
+
+        total = (await db.execute(count_query)).scalar() or 0
+        stmt = query.order_by(PaperFill.created_at.desc()).limit(limit).offset(offset)
+        fills = (await db.execute(stmt)).scalars().all()
+
+        fill_responses = [
+            PaperFillResponse(
+                id=f.id,
+                order_id=f.order_id,
+                symbol=f.symbol,
+                side=f.side,
+                fill_price=f.fill_price,
+                quantity=f.quantity,
+                gross_notional=f.gross_notional,
+                fee=f.fee,
+                slippage_cost=f.slippage_cost,
+                realized_pnl=f.realized_pnl,
+                created_at=f.created_at,
+            )
+            for f in fills
+        ]
+        return total, fill_responses
+
+    async def list_events_paginated(
+        self,
+        db: AsyncSession,
+        severity: Optional[str] = None,
+        event_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[int, List[dict]]:
+        """Returns total count and paginated list of system/risk/lifecycle events."""
+        query = select(PaperRiskEvent)
+        count_query = select(func.count(PaperRiskEvent.id))
+
+        if severity:
+            query = query.where(PaperRiskEvent.severity == severity.upper())
+            count_query = count_query.where(PaperRiskEvent.severity == severity.upper())
+        if event_type:
+            query = query.where(PaperRiskEvent.event_type == event_type.upper())
+            count_query = count_query.where(PaperRiskEvent.event_type == event_type.upper())
+
+        total = (await db.execute(count_query)).scalar() or 0
+        stmt = query.order_by(PaperRiskEvent.created_at.desc()).limit(limit).offset(offset)
+        events = (await db.execute(stmt)).scalars().all()
+
+        items = [
+            {
+                "id": e.id,
+                "account_id": e.account_id,
+                "event_type": e.event_type,
+                "severity": e.severity,
+                "reason": e.reason,
+                "metadata_json": e.metadata_json or {},
+                "created_at": e.created_at,
+            }
+            for e in events
+        ]
+        return total, items
+
+    async def reset_risk_limits(
+        self,
+        db: AsyncSession,
+        confirmation_code: str,
+        reset_emergency_stop: bool = True,
+        reset_consecutive_losses: bool = True,
+        reset_daily_loss: bool = False,
+        reason: Optional[str] = None,
+    ) -> RiskStatusResponse:
+        """
+        Operator authorized reset of breached risk controls.
+        Safety Invariant: Requires explicit 'CONFIRM_RESET' code and writes an immutable audit record.
+        """
+        if confirmation_code.strip() != "CONFIRM_RESET":
+            raise InvalidOrderException("Invalid confirmation code. Must supply 'CONFIRM_RESET'.")
+
+        account = await self.broker.get_or_create_default_account(db)
+        risk_state = await self.broker.get_account_risk_state(db, account.id)
+
+        actions_taken = []
+        if reset_emergency_stop and risk_state.emergency_stop:
+            risk_state.emergency_stop = False
+            risk_state.kill_switch_reason = None
+            actions_taken.append("emergency_stop_cleared")
+
+        if reset_consecutive_losses and risk_state.consecutive_losses > 0:
+            risk_state.consecutive_losses = 0
+            actions_taken.append("consecutive_losses_reset")
+
+        if reset_daily_loss:
+            risk_state.current_daily_pnl = 0.0
+            actions_taken.append("daily_loss_reset")
+
+        # Persist audit event
+        audit_reason = reason or "Operator manual risk reset applied"
+        audit_event = PaperRiskEvent(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            event_type="RISK_RESET",
+            severity="WARNING",
+            reason=f"{audit_reason}: {', '.join(actions_taken) if actions_taken else 'no_changes'}",
+            metadata_json={
+                "actions": actions_taken,
+                "reset_emergency_stop": reset_emergency_stop,
+                "reset_consecutive_losses": reset_consecutive_losses,
+                "reset_daily_loss": reset_daily_loss,
+            },
+        )
+        db.add(audit_event)
+        await db.commit()
+
+        return await self.get_risk_status(db)

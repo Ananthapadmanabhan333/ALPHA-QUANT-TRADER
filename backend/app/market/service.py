@@ -255,3 +255,9 @@ class MarketDataService:
             return await self.backfill_range(db, norm_symbol, interval, gap_start, now_utc)
 
         return 0
+
+    async def check_market_data_dependency(self) -> Dict[str, Any]:
+        """
+        Operational readiness probe verifying market data dependency health.
+        """
+        return await self.rest_adapter.ping()
