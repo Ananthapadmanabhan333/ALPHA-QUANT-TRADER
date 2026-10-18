@@ -268,16 +268,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if assets_dir.is_dir():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend_assets")
 
+    # Add Vercel CDN edge cache headers for static /assets/* so they are served from edge in <15ms
+    @app.middleware("http")
+    async def static_asset_cache_middleware(request: Request, call_next) -> Response:
+        resp = await call_next(request)
+        if request.url.path.startswith("/assets/") or request.url.path == "/alpha-logo.svg":
+            resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
+
     @app.get("/", tags=["System"], summary="Root Information or Trader Web UI")
     async def root_info(request: Request):
         accept_header = request.headers.get("accept", "")
         index_file = frontend_dist / "index.html"
         if (
             settings.ENVIRONMENT != "testing"
-            and "text/html" in accept_header
             and index_file.is_file()
+            and ("text/html" in accept_header or "*/*" in accept_header or not accept_header)
         ):
-            return FileResponse(str(index_file))
+            return FileResponse(
+                str(index_file),
+                headers={"Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300"},
+            )
         return {
             "name": settings.PROJECT_NAME,
             "version": settings.VERSION,
@@ -306,7 +317,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return FileResponse(str(req_file))
             index_file = frontend_dist / "index.html"
             if index_file.is_file():
-                return FileResponse(str(index_file))
+                return FileResponse(
+                    str(index_file),
+                    headers={"Cache-Control": "public, max-age=0, s-maxage=60, stale-while-revalidate=300"},
+                )
             return {"status": "frontend_not_built"}
 
     return app

@@ -1,17 +1,28 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark" style="background-color: #0B0F17; color: #F9FAFB;">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="/alpha-logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ALPHA Quant | Institutional Intelligence & Execution Core</title>
     <meta name="description" content="ALPHA Quant Institutional Quantitative Platform - Phase 1 Foundation" />
+    <style>
+      html, body { background-color: #0B0F17; color: #F9FAFB; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+      @keyframes alphaPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   </head>
   <body class="bg-alpha-bg text-alpha-text-primary antialiased selection:bg-alpha-gold selection:text-black min-h-screen">
-    <div id="root"></div>
+    <div id="root">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background-color:#0B0F17;color:#F9FAFB;font-family:monospace;">
+        <div style="padding:8px 16px;border-radius:6px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);color:#F59E0B;font-weight:700;font-size:13px;letter-spacing:0.12em;animation:alphaPulse 1.4s infinite;">
+          ALPHA QUANT • INITIALIZING COMMAND DESK...
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+
