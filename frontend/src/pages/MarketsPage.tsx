@@ -147,32 +147,32 @@ export const MarketsPage: React.FC = () => {
   const hoveredCandle = hoveredIndex !== null && candles[hoveredIndex] ? candles[hoveredIndex] : null;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6 animate-fade-in pb-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-alpha-gold" />
-              <span>MARKET DATA & TECHNICAL OVERLAYS</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-alpha-border">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-alpha-gold shrink-0" />
+              <span>MARKET DATA & OVERLAYS</span>
             </h1>
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/10 text-alpha-gold border border-alpha-gold/30">
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/10 text-alpha-gold border border-alpha-gold/30 whitespace-nowrap">
               BTC/USDT SPOT
             </span>
           </div>
-          <p className="text-xs text-alpha-text-secondary mt-1 font-mono">
-            Binance Public Spot Feed • Sub-second Ingestion • TimescaleDB Continuous Partitioning
+          <p className="text-[11px] sm:text-xs text-alpha-text-secondary mt-1 font-mono">
+            Binance Public Spot Feed • Sub-second Ingestion • Continuous Partitioning
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {/* Interval Selector */}
           <div className="flex items-center bg-alpha-card rounded-lg p-1 border border-alpha-border">
             {(['1m', '5m', '15m'] as const).map((int) => (
               <button
                 key={int}
                 onClick={() => setInterval(int)}
-                className={`px-3 py-1 text-xs font-mono rounded font-medium transition-colors ${
+                className={`px-2.5 sm:px-3 py-1 text-xs font-mono rounded font-medium transition-colors ${
                   interval === int
                     ? 'bg-alpha-gold text-black font-semibold shadow-sm'
                     : 'text-alpha-text-secondary hover:text-white'
@@ -208,7 +208,7 @@ export const MarketsPage: React.FC = () => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors"
+            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors ml-auto sm:ml-0"
             title="Refresh Feed"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-alpha-gold' : ''}`} />
@@ -220,7 +220,7 @@ export const MarketsPage: React.FC = () => {
       {syncMsg && (
         <div className="p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-between text-emerald-300 text-xs font-mono">
           <span>✓ {syncMsg}</span>
-          <button onClick={() => setSyncMsg(null)} className="text-emerald-400 hover:text-white">✕</button>
+          <button onClick={() => setSyncMsg(null)} className="text-emerald-400 hover:text-white ml-2">✕</button>
         </div>
       )}
 
@@ -253,16 +253,16 @@ export const MarketsPage: React.FC = () => {
       )}
 
       {/* Chart Canvas Card */}
-      <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card shadow-sm space-y-4">
+      <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card shadow-sm space-y-4">
         {/* Chart Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-alpha-borderSubtle pb-3">
-          <div className="flex items-center gap-4 text-xs font-mono">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-alpha-borderSubtle pb-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs font-mono">
             <span className="text-white font-semibold">
               BTC/USDT <span className="text-alpha-gold font-normal">({interval})</span>
             </span>
 
             {hoveredCandle ? (
-              <div className="flex items-center gap-3 text-[11px] text-alpha-text-secondary bg-alpha-surface px-2.5 py-1 rounded border border-alpha-borderSubtle">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[10px] sm:text-[11px] text-alpha-text-secondary bg-alpha-surface px-2.5 py-1 rounded border border-alpha-borderSubtle">
                 <span>O: <strong className="text-white">{hoveredCandle.open.toFixed(2)}</strong></span>
                 <span>H: <strong className="text-emerald-400">{hoveredCandle.high.toFixed(2)}</strong></span>
                 <span>L: <strong className="text-rose-400">{hoveredCandle.low.toFixed(2)}</strong></span>
@@ -277,7 +277,7 @@ export const MarketsPage: React.FC = () => {
           </div>
 
           {/* Technical Overlays Toggles */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               onClick={() => setShowSMA20(!showSMA20)}
               className={`px-2.5 py-1 rounded text-[11px] font-mono border transition-colors flex items-center gap-1.5 ${
@@ -404,6 +404,7 @@ export const MarketsPage: React.FC = () => {
                   <g
                     key={candle.open_time}
                     onMouseEnter={() => setHoveredIndex(idx)}
+                    onClick={() => setHoveredIndex(idx)}
                     className="cursor-pointer"
                   >
                     {/* Hover highlight background column */}

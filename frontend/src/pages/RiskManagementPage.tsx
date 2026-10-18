@@ -113,11 +113,11 @@ export const RiskManagementPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-alpha-border">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-              <ShieldAlert className="w-6 h-6 text-alpha-gold" />
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 text-alpha-gold shrink-0" />
               <span>CENTRAL RISK GATE & KILL-SWITCH</span>
             </h1>
             <span
@@ -136,21 +136,21 @@ export const RiskManagementPage: React.FC = () => {
         </div>
 
         {/* Global Kill Switch & Reset Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {risk?.emergency_stop ? (
             <button
               onClick={() => setShowResetModal(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+              className="flex-1 sm:flex-initial justify-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4 shrink-0" />
               <span>Operator Reset (CONFIRM_RESET)</span>
             </button>
           ) : (
             <button
               onClick={() => setShowHaltModal(true)}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+              className="flex-1 sm:flex-initial justify-center px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
             >
-              <ShieldAlert className="w-4 h-4" />
+              <ShieldAlert className="w-4 h-4 shrink-0" />
               <span>Trigger Emergency Stop</span>
             </button>
           )}
@@ -158,7 +158,7 @@ export const RiskManagementPage: React.FC = () => {
           <button
             onClick={loadRiskData}
             disabled={isRefreshing}
-            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors"
+            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors shrink-0"
             title="Refresh Risk Telemetry"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-alpha-gold' : ''}`} />
@@ -168,15 +168,15 @@ export const RiskManagementPage: React.FC = () => {
 
       {/* Emergency Stop Critical Alert */}
       {risk?.emergency_stop && (
-        <div className="p-5 rounded-xl border border-rose-900/80 bg-rose-950/60 shadow-lg text-rose-200 space-y-2">
-          <div className="flex items-center gap-3 font-mono font-bold text-sm tracking-wider">
-            <XCircle className="w-6 h-6 text-rose-400 animate-pulse flex-shrink-0" />
+        <div className="p-4 sm:p-5 rounded-xl border border-rose-900/80 bg-rose-950/60 shadow-lg text-rose-200 space-y-2">
+          <div className="flex items-start sm:items-center gap-3 font-mono font-bold text-xs sm:text-sm tracking-wider">
+            <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-rose-400 animate-pulse flex-shrink-0 mt-0.5 sm:mt-0" />
             <span>CIRCUIT BREAKER ACTIVE — ALL SIMULATED ORDER ENTRIES ARE HARD-BLOCKED</span>
           </div>
-          <p className="text-xs font-mono text-rose-300 pl-9">
+          <p className="text-xs font-mono text-rose-300 sm:pl-9">
             Reason: <strong className="text-white">{risk.kill_switch_reason || 'Manual emergency stop or loss limit breach.'}</strong>
           </p>
-          <div className="pl-9 pt-1">
+          <div className="sm:pl-9 pt-1">
             <button
               onClick={() => setShowResetModal(true)}
               className="px-3 py-1.5 rounded bg-rose-800 hover:bg-rose-700 text-white text-xs font-mono transition-colors font-semibold"
@@ -203,64 +203,64 @@ export const RiskManagementPage: React.FC = () => {
       )}
 
       {/* Risk Metrics Status Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Drawdown Gauge */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-alpha-text-muted mb-2 font-mono uppercase">
             <span>Peak Drawdown</span>
-            <TrendingDown className="w-4 h-4 text-rose-400" />
+            <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-lg sm:text-2xl font-bold font-mono text-white truncate">
             {(risk?.current_drawdown_pct ?? 0).toFixed(2)}%
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
-            <span>Configured Limit:</span>
+          <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
+            <span>Limit:</span>
             <span className="text-rose-400 font-semibold">{(risk?.max_drawdown_limit_pct ?? 5.0).toFixed(1)}%</span>
           </div>
         </div>
 
         {/* Daily Loss Gauge */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-alpha-text-muted mb-2 font-mono uppercase">
             <span>Daily Loss P&L</span>
-            <DollarSign className="w-4 h-4 text-alpha-gold" />
+            <DollarSign className="w-4 h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className={`text-2xl font-bold font-mono ${(risk?.current_daily_pnl ?? 0) < 0 ? 'text-rose-400' : 'text-white'}`}>
+          <div className={`text-lg sm:text-2xl font-bold font-mono truncate ${(risk?.current_daily_pnl ?? 0) < 0 ? 'text-rose-400' : 'text-white'}`}>
             ${(risk?.current_daily_pnl ?? 0).toFixed(2)}
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
-            <span>Limit Threshold:</span>
+          <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
+            <span>Limit:</span>
             <span className="text-rose-400 font-semibold">{(risk?.daily_loss_limit_pct ?? 2.0).toFixed(1)}%</span>
           </div>
         </div>
 
         {/* Consecutive Losses */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>Loss Streak Counter</span>
-            <Activity className="w-4 h-4 text-alpha-gold" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-alpha-text-muted mb-2 font-mono uppercase">
+            <span>Loss Streak</span>
+            <Activity className="w-4 h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-lg sm:text-2xl font-bold font-mono text-white truncate">
             {risk?.consecutive_losses ?? 0}
             <span className="text-xs text-alpha-text-muted font-normal"> / {risk?.consecutive_loss_limit ?? 5}</span>
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
-            <span>Trip Action:</span>
-            <span className="text-amber-400">Emergency Halt</span>
+          <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
+            <span>Trip:</span>
+            <span className="text-amber-400">Halt</span>
           </div>
         </div>
 
         {/* Feed Freshness / Status */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>Data Feed Status</span>
-            <Radio className="w-4 h-4 text-alpha-gold" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card">
+          <div className="flex items-center justify-between text-[11px] sm:text-xs text-alpha-text-muted mb-2 font-mono uppercase">
+            <span>Data Feed</span>
+            <Radio className="w-4 h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className="text-2xl font-bold font-mono text-white">
+          <div className="text-lg sm:text-2xl font-bold font-mono text-white truncate">
             {risk?.feed_status || 'HEALTHY'}
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
-            <span>Order Gate:</span>
+          <div className="mt-3 flex items-center justify-between text-[10px] sm:text-xs font-mono text-alpha-text-muted border-t border-alpha-borderSubtle pt-2">
+            <span>Gate:</span>
             <span className={risk?.is_trading_allowed ? 'text-emerald-400 font-semibold' : 'text-rose-400 font-semibold'}>
               {risk?.is_trading_allowed ? 'OPEN' : 'BLOCKED'}
             </span>

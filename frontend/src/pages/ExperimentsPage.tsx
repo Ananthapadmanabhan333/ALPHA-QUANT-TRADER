@@ -106,11 +106,11 @@ export const ExperimentsPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-alpha-border">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
-              <FlaskConical className="w-6 h-6 text-alpha-gold" />
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 sm:w-6 sm:h-6 text-alpha-gold shrink-0" />
               <span>REPRODUCIBLE QUANT EXPERIMENTS</span>
             </h1>
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/10 text-alpha-gold border border-alpha-gold/30">
@@ -122,19 +122,19 @@ export const ExperimentsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowRunModal(true)}
-            className="px-3.5 py-2 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-semibold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+            className="flex-1 sm:flex-initial justify-center px-3.5 py-2 bg-alpha-gold hover:bg-alpha-gold/90 text-black font-semibold text-xs font-mono rounded-lg transition-colors flex items-center gap-2 shadow-sm"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <Play className="w-3.5 h-3.5 fill-current shrink-0" />
             <span>New Experiment</span>
           </button>
 
           <button
             onClick={loadData}
             disabled={isLoading}
-            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors"
+            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors shrink-0"
             title="Refresh Experiments"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-alpha-gold' : ''}`} />

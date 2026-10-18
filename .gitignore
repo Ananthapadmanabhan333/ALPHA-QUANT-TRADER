@@ -71,3 +71,5 @@ ehthumbs.db
 *.swp
 *.swo
 *~
+
+.vercel

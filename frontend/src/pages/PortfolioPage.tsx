@@ -299,61 +299,61 @@ export const PortfolioPage: React.FC = () => {
       )}
 
       {/* Account KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Virtual Cash</span>
-            <DollarSign className="w-4 h-4 text-alpha-gold" />
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary truncate">Virtual Cash</span>
+            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <p className="text-2xl font-mono font-bold text-alpha-text-primary mt-2">
+          <p className="text-lg sm:text-2xl font-mono font-bold text-alpha-text-primary mt-1.5 sm:mt-2 truncate">
             ${(account?.virtual_balance ?? 10000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-alpha-text-secondary mt-1">USDT Available</p>
+          <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">USDT Available</p>
         </div>
 
-        <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+        <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Total Equity</span>
-            <Layers className="w-4 h-4 text-alpha-gold" />
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary truncate">Total Equity</span>
+            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <p className="text-2xl font-mono font-bold text-alpha-text-primary mt-2">
+          <p className="text-lg sm:text-2xl font-mono font-bold text-alpha-text-primary mt-1.5 sm:mt-2 truncate">
             ${(account?.total_equity ?? 10000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
-          <p className="text-[11px] text-alpha-text-secondary mt-1">Cash + Inventory Value</p>
+          <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Cash + Inventory</p>
         </div>
 
-        <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+        <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Realized P&L</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary truncate">Realized P&L</span>
+            <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 shrink-0" />
           </div>
-          <p className={`text-2xl font-mono font-bold mt-2 ${(account?.realized_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+          <p className={`text-lg sm:text-2xl font-mono font-bold mt-1.5 sm:mt-2 truncate ${(account?.realized_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             ${(account?.realized_pnl ?? 0) >= 0 ? '+' : ''}{(account?.realized_pnl ?? 0).toFixed(2)}
           </p>
-          <p className="text-[11px] text-alpha-text-secondary mt-1">Post Fees & Slippage</p>
+          <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Post Fees & Slip</p>
         </div>
 
-        <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+        <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Unrealized P&L</span>
-            <TrendingDown className="w-4 h-4 text-alpha-gold" />
+            <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary truncate">Unrealized P&L</span>
+            <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <p className={`text-2xl font-mono font-bold mt-2 ${(account?.unrealized_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+          <p className={`text-lg sm:text-2xl font-mono font-bold mt-1.5 sm:mt-2 truncate ${(account?.unrealized_pnl ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             ${(account?.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{(account?.unrealized_pnl ?? 0).toFixed(2)}
           </p>
-          <p className="text-[11px] text-alpha-text-secondary mt-1">Mark-to-Market Valuation</p>
+          <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Mark-to-Market</p>
         </div>
       </div>
 
       {/* Central Risk Gate Telemetry Bar */}
       {risk && (
-        <div className="bg-alpha-card border border-alpha-border rounded-xl p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-alpha-border pb-3">
+        <div className="bg-alpha-card border border-alpha-border rounded-xl p-4 sm:p-5 shadow-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-alpha-border pb-3">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-alpha-gold" />
+              <ShieldCheck className="w-4 h-4 text-alpha-gold shrink-0" />
               <span>Central Pre-Trade Risk Gate Telemetry</span>
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded border ${
                 risk.feed_status === 'HEALTHY'
                   ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
@@ -371,35 +371,35 @@ export const PortfolioPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 text-xs font-mono">
             <div className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-              <span className="text-alpha-text-secondary">Current Drawdown</span>
-              <p className={`text-base font-bold mt-1 ${risk.current_drawdown_pct >= risk.max_drawdown_limit_pct ? 'text-rose-400' : 'text-alpha-text-primary'}`}>
+              <span className="text-alpha-text-secondary text-[11px]">Drawdown</span>
+              <p className={`text-sm sm:text-base font-bold mt-1 ${risk.current_drawdown_pct >= risk.max_drawdown_limit_pct ? 'text-rose-400' : 'text-alpha-text-primary'}`}>
                 {risk.current_drawdown_pct.toFixed(2)}%
               </p>
               <span className="text-[10px] text-alpha-text-secondary">Limit: {risk.max_drawdown_limit_pct.toFixed(1)}%</span>
             </div>
 
             <div className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-              <span className="text-alpha-text-secondary">Daily Loss P&L</span>
-              <p className="text-base font-bold text-alpha-text-primary mt-1">
+              <span className="text-alpha-text-secondary text-[11px]">Daily P&L</span>
+              <p className="text-sm sm:text-base font-bold text-alpha-text-primary mt-1">
                 ${risk.current_daily_pnl.toFixed(2)}
               </p>
               <span className="text-[10px] text-alpha-text-secondary">Limit: {risk.daily_loss_limit_pct.toFixed(1)}%</span>
             </div>
 
             <div className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-              <span className="text-alpha-text-secondary">Loss Streak</span>
-              <p className={`text-base font-bold mt-1 ${risk.consecutive_losses >= risk.consecutive_loss_limit ? 'text-rose-400' : 'text-alpha-text-primary'}`}>
-                {risk.consecutive_losses} loss trades
+              <span className="text-alpha-text-secondary text-[11px]">Loss Streak</span>
+              <p className={`text-sm sm:text-base font-bold mt-1 ${risk.consecutive_losses >= risk.consecutive_loss_limit ? 'text-rose-400' : 'text-alpha-text-primary'}`}>
+                {risk.consecutive_losses} trades
               </p>
-              <span className="text-[10px] text-alpha-text-secondary">Limit: {risk.consecutive_loss_limit} consecutive</span>
+              <span className="text-[10px] text-alpha-text-secondary">Limit: {risk.consecutive_loss_limit} max</span>
             </div>
 
             <div className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-              <span className="text-alpha-text-secondary">Max Limits</span>
-              <p className="text-base font-bold text-alpha-gold mt-1">
-                {risk.max_position_pct.toFixed(0)}% pos / ${risk.max_order_notional.toLocaleString()}
+              <span className="text-alpha-text-secondary text-[11px]">Max Limits</span>
+              <p className="text-sm sm:text-base font-bold text-alpha-gold mt-1 truncate">
+                {risk.max_position_pct.toFixed(0)}% / ${risk.max_order_notional.toLocaleString()}
               </p>
               <span className="text-[10px] text-alpha-text-secondary">Max Exp: {risk.max_portfolio_exposure_pct.toFixed(0)}%</span>
             </div>
@@ -411,10 +411,10 @@ export const PortfolioPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Simulated Order Launcher */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-alpha-text-primary flex items-center gap-2">
-                <Play className="w-4 h-4 text-alpha-gold" />
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-4 sm:p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h2 className="text-sm sm:text-base font-semibold text-alpha-text-primary flex items-center gap-2">
+                <Play className="w-4 h-4 text-alpha-gold shrink-0" />
                 <span>Submit Simulated Order</span>
               </h2>
               <span className="px-2 py-0.5 text-[11px] font-mono font-bold rounded bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30">
@@ -463,17 +463,17 @@ export const PortfolioPage: React.FC = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
                   <label className="block text-xs font-semibold text-alpha-text-secondary">
                     Quantity ({symbol.replace('USDT', '')})
                   </label>
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     {[0.002, 0.005, 0.01].map((q) => (
                       <button
                         key={q}
                         type="button"
                         onClick={() => setQuantity(q)}
-                        className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
+                        className="px-2 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
                       >
                         {q}
                       </button>
@@ -487,7 +487,7 @@ export const PortfolioPage: React.FC = () => {
                           const refP = orderType === 'limit' ? price : livePrice;
                           if (refP > 0) setQuantity(Number((maxSafeNotional / refP).toFixed(4)));
                         }}
-                        className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-gold/10 border border-alpha-gold/40 text-alpha-gold hover:bg-alpha-gold/20 transition-colors"
+                        className="px-2 py-0.5 text-[10px] font-mono rounded bg-alpha-gold/10 border border-alpha-gold/40 text-alpha-gold hover:bg-alpha-gold/20 transition-colors"
                         title="Size to 9.5% of equity (within 10% risk gate concentration limit)"
                       >
                         Max Safe
@@ -497,7 +497,7 @@ export const PortfolioPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => setQuantity(Number((account.positions[0]?.quantity ?? 0).toFixed(4)))}
-                          className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 transition-colors"
+                          className="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 transition-colors"
                         >
                           100% Pos
                         </button>
@@ -517,11 +517,11 @@ export const PortfolioPage: React.FC = () => {
 
               {orderType === 'limit' && (
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1.5">
                     <label className="block text-xs font-semibold text-alpha-text-secondary">
                       Limit Price ($ USD)
                     </label>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {[
                         { label: '-0.5%', mult: 0.995 },
                         { label: '-0.1%', mult: 0.999 },
@@ -533,7 +533,7 @@ export const PortfolioPage: React.FC = () => {
                           key={btn.label}
                           type="button"
                           onClick={() => setPrice(Math.round(livePrice * btn.mult))}
-                          className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
+                          className="px-2 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
                         >
                           {btn.label}
                         </button>

@@ -3,9 +3,14 @@
 @tailwind utilities;
 
 @layer base {
+  html,
   body {
     background-color: #0A0A0C;
     color: #F3F4F6;
+    overflow-x: hidden;
+    max-width: 100vw;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
   }
 }
 
@@ -28,6 +33,11 @@
   background: #D4AF37;
 }
 
+/* Smooth horizontal table scrolling on mobile devices */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
 .gold-glow {
   box-shadow: 0 0 15px rgba(212, 175, 55, 0.15);
 }
@@ -35,4 +45,9 @@
 .gold-border-glow {
   border-color: rgba(212, 175, 55, 0.35);
   box-shadow: 0 0 12px rgba(212, 175, 55, 0.12);
+}
+
+/* Safe area padding for notched iOS/Android screens */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

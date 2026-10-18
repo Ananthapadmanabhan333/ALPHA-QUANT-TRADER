@@ -185,20 +185,20 @@ export const BacktestPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-alpha-border">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-alpha-text-primary flex items-center gap-3">
-            <History className="w-6 h-6 text-alpha-gold" />
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-alpha-text-primary flex items-center gap-2 sm:gap-3">
+            <History className="w-5 h-5 sm:w-6 sm:h-6 text-alpha-gold shrink-0" />
             <span>Deterministic Historical Backtest Engine</span>
           </h1>
-          <p className="text-sm text-alpha-text-secondary mt-1">
+          <p className="text-xs sm:text-sm text-alpha-text-secondary mt-1">
             Strict Next-Bar Event-Driven Execution, Explicit Slippage & Fee Drag, Walk-Forward Validation & Regime Stress Testing
           </p>
         </div>
         <button
           onClick={loadData}
           disabled={isLoading || isSimulating}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-alpha-border bg-alpha-surface text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold transition-colors disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border border-alpha-border bg-alpha-surface text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh Engine
@@ -207,49 +207,49 @@ export const BacktestPage: React.FC = () => {
 
       {/* Global Performance Summary Cards */}
       {analytics && analytics.total_backtests > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Simulations</span>
-              <Layers className="w-4 h-4 text-alpha-gold" />
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Simulations</span>
+              <Layers className="w-4 h-4 text-alpha-gold shrink-0" />
             </div>
-            <p className="text-2xl font-mono font-bold text-alpha-text-primary mt-2">
+            <p className="text-lg sm:text-2xl font-mono font-bold text-alpha-text-primary mt-2 truncate">
               {analytics.total_backtests}
             </p>
-            <p className="text-[11px] text-alpha-text-secondary mt-1">Audited Historical Runs</p>
+            <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Audited Historical Runs</p>
           </div>
 
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Net Return</span>
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Net Return</span>
+              <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0" />
             </div>
-            <p className={`text-2xl font-mono font-bold mt-2 ${analytics.avg_net_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <p className={`text-lg sm:text-2xl font-mono font-bold mt-2 truncate ${analytics.avg_net_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {analytics.avg_net_return_pct >= 0 ? '+' : ''}{analytics.avg_net_return_pct.toFixed(2)}%
             </p>
-            <p className="text-[11px] text-alpha-text-secondary mt-1">Post Fees & Slippage</p>
+            <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Post Fees & Slippage</p>
           </div>
 
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Sharpe Ratio</span>
-              <Sliders className="w-4 h-4 text-alpha-gold" />
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Sharpe Ratio</span>
+              <Sliders className="w-4 h-4 text-alpha-gold shrink-0" />
             </div>
-            <p className="text-2xl font-mono font-bold text-alpha-text-primary mt-2">
+            <p className="text-lg sm:text-2xl font-mono font-bold text-alpha-text-primary mt-2 truncate">
               {analytics.avg_sharpe_ratio.toFixed(2)}
             </p>
-            <p className="text-[11px] text-alpha-text-secondary mt-1">525,600 min/yr (24/7/365)</p>
+            <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">525,600 min/yr (24/7/365)</p>
           </div>
 
-          <div className="bg-alpha-card border border-alpha-border rounded-xl p-4">
+          <div className="bg-alpha-card border border-alpha-border rounded-xl p-3.5 sm:p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Max Drawdown</span>
-              <TrendingDown className="w-4 h-4 text-rose-400" />
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-alpha-text-secondary">Avg Max Drawdown</span>
+              <TrendingDown className="w-4 h-4 text-rose-400 shrink-0" />
             </div>
-            <p className="text-2xl font-mono font-bold text-rose-400 mt-2">
+            <p className="text-lg sm:text-2xl font-mono font-bold text-rose-400 mt-2 truncate">
               {analytics.avg_max_drawdown_pct.toFixed(2)}%
             </p>
-            <p className="text-[11px] text-alpha-text-secondary mt-1">Peak-to-Trough Loss</p>
+            <p className="text-[10px] sm:text-[11px] text-alpha-text-secondary mt-1">Peak-to-Trough Loss</p>
           </div>
         </div>
       )}

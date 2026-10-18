@@ -179,25 +179,25 @@ export const OverviewPage: React.FC = () => {
   const isFresh = lastExchangeTime ? (Date.now() - lastExchangeTime.getTime()) < 120000 : false;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-12">
+    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6 animate-fade-in pb-6">
       {/* Top Banner / System HUD */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 sm:pb-6 border-b border-alpha-border">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-white font-mono flex items-center gap-2">
               <span>ALPHA QUANT COMMAND CENTER</span>
             </h1>
-            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30">
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30 whitespace-nowrap">
               LIVE SYSTEM TELEMETRY
             </span>
           </div>
-          <p className="text-xs text-alpha-text-secondary mt-1 font-mono">
+          <p className="text-[11px] sm:text-xs text-alpha-text-secondary mt-1 font-mono">
             BTC/USDT Spot Pipeline • Deterministic Engine • Central Risk Gate Active
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
+        <div className="flex items-center justify-between sm:justify-end gap-3">
+          <div className="text-left sm:text-right">
             <span className="text-[10px] font-mono text-alpha-text-muted block">Telemetry Heartbeat</span>
             <span className="text-xs font-mono text-alpha-text-secondary">
               {lastRefreshedAt.toLocaleTimeString()} UTC
@@ -207,7 +207,7 @@ export const OverviewPage: React.FC = () => {
           <button
             onClick={loadOverviewData}
             disabled={isRefreshing}
-            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors"
+            className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors shrink-0"
             title="Refresh Telemetry"
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-alpha-gold' : ''}`} />
@@ -217,11 +217,11 @@ export const OverviewPage: React.FC = () => {
 
       {/* Emergency Stop / Circuit Breaker Banner */}
       {riskStatus?.emergency_stop && (
-        <div className="p-4 rounded-xl border border-rose-900/80 bg-rose-950/50 flex items-center justify-between text-rose-200 shadow-lg">
-          <div className="flex items-center gap-3">
-            <ShieldAlert className="w-6 h-6 text-rose-400 flex-shrink-0 animate-pulse" />
+        <div className="p-4 rounded-xl border border-rose-900/80 bg-rose-950/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-200 shadow-lg">
+          <div className="flex items-start sm:items-center gap-3">
+            <ShieldAlert className="w-6 h-6 text-rose-400 flex-shrink-0 animate-pulse mt-0.5 sm:mt-0" />
             <div>
-              <span className="font-bold text-sm uppercase tracking-wide">
+              <span className="font-bold text-xs sm:text-sm uppercase tracking-wide block">
                 CIRCUIT BREAKER ACTIVATED — EMERGENCY STOP ENGAGED
               </span>
               <p className="text-xs text-rose-300/90 mt-0.5 font-mono">
@@ -231,7 +231,7 @@ export const OverviewPage: React.FC = () => {
           </div>
           <a
             href="/risk"
-            className="px-3 py-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-100 text-xs font-mono border border-rose-700 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-rose-900/60 hover:bg-rose-800 text-rose-100 text-xs font-mono border border-rose-700 transition-colors text-center whitespace-nowrap"
           >
             Resolve in Risk Center &rarr;
           </a>
@@ -247,15 +247,15 @@ export const OverviewPage: React.FC = () => {
       )}
 
       {/* Primary KPI Metrics Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* 1. BTC/USDT Price & Feed Freshness */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>BTC/USDT Spot Price</span>
-            <Activity className="w-4 h-4 text-alpha-gold" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-alpha-text-muted mb-1.5 sm:mb-2 font-mono uppercase">
+            <span className="truncate">BTC/USDT Spot</span>
+            <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">
+          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+            <span className="text-lg sm:text-2xl font-bold font-mono text-white truncate">
               {currentPrice !== null ? `$${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'No Feed'}
             </span>
             {currentPrice !== null && (
@@ -284,13 +284,13 @@ export const OverviewPage: React.FC = () => {
         </div>
 
         {/* 2. Virtual Equity & Net P&L */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>Simulated Equity</span>
-            <DollarSign className="w-4 h-4 text-alpha-gold" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-alpha-text-muted mb-1.5 sm:mb-2 font-mono uppercase">
+            <span className="truncate">Simulated Equity</span>
+            <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">
+          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+            <span className="text-lg sm:text-2xl font-bold font-mono text-white truncate">
               ${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span
@@ -301,54 +301,54 @@ export const OverviewPage: React.FC = () => {
               {netPnl >= 0 ? '+' : ''}${netPnl.toFixed(2)}
             </span>
           </div>
-          <div className="mt-3 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[11px] font-mono">
-            <span className="text-alpha-text-muted">Cash Balance:</span>
-            <span className="text-alpha-text-secondary">${virtualCash.toFixed(2)} USDT</span>
+          <div className="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[10px] sm:text-[11px] font-mono">
+            <span className="text-alpha-text-muted">Cash:</span>
+            <span className="text-alpha-text-secondary truncate">${virtualCash.toFixed(2)}</span>
           </div>
         </div>
 
         {/* 3. Drawdown & Peak Equity */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>Peak-To-Trough Drawdown</span>
-            <TrendingDown className="w-4 h-4 text-rose-400" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-alpha-text-muted mb-1.5 sm:mb-2 font-mono uppercase">
+            <span className="truncate">Peak Drawdown</span>
+            <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-400 shrink-0" />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
             <span
-              className={`text-2xl font-bold font-mono ${
+              className={`text-lg sm:text-2xl font-bold font-mono ${
                 (riskStatus?.current_drawdown_pct ?? 0) > 2.0 ? 'text-rose-400' : 'text-white'
               }`}
             >
               {(riskStatus?.current_drawdown_pct ?? 0).toFixed(2)}%
             </span>
             <span className="text-[10px] font-mono text-alpha-text-muted">
-              Limit: {(riskStatus?.max_drawdown_limit_pct ?? 5.0).toFixed(1)}%
+              Lim: {(riskStatus?.max_drawdown_limit_pct ?? 5.0).toFixed(1)}%
             </span>
           </div>
-          <div className="mt-3 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[11px] font-mono">
-            <span className="text-alpha-text-muted">Peak Equity:</span>
-            <span className="text-alpha-text-secondary">
+          <div className="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[10px] sm:text-[11px] font-mono">
+            <span className="text-alpha-text-muted">Peak:</span>
+            <span className="text-alpha-text-secondary truncate">
               ${(riskStatus?.peak_equity ?? totalEquity).toFixed(2)}
             </span>
           </div>
         </div>
 
         {/* 4. Portfolio Exposure & Drag */}
-        <div className="p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-xs text-alpha-text-muted mb-2 font-mono uppercase">
-            <span>Portfolio Exposure</span>
-            <Layers className="w-4 h-4 text-alpha-gold" />
+        <div className="p-3.5 sm:p-5 rounded-xl border border-alpha-border bg-alpha-card/90 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between text-[10px] sm:text-xs text-alpha-text-muted mb-1.5 sm:mb-2 font-mono uppercase">
+            <span className="truncate">Exposure</span>
+            <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-alpha-gold shrink-0" />
           </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold font-mono text-white">
+          <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+            <span className="text-lg sm:text-2xl font-bold font-mono text-white">
               {exposurePct.toFixed(1)}%
             </span>
-            <span className="text-xs font-mono text-alpha-text-muted">
-              (${positionValue.toFixed(2)})
+            <span className="text-[11px] font-mono text-alpha-text-muted truncate">
+              (${positionValue.toFixed(0)})
             </span>
           </div>
-          <div className="mt-3 pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[11px] font-mono">
-            <span className="text-alpha-text-muted">Fees & Slippage Drag:</span>
+          <div className="mt-2.5 sm:mt-3 pt-2.5 sm:pt-3 border-t border-alpha-borderSubtle flex items-center justify-between text-[10px] sm:text-[11px] font-mono">
+            <span className="text-alpha-text-muted">Fee Drag:</span>
             <span className="text-alpha-gold font-medium">
               ${(totalFees + totalSlippage).toFixed(2)}
             </span>
