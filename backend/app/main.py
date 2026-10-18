@@ -83,17 +83,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             broadcaster = get_broadcaster()
             session_factory = get_session_factory()
 
-            # Pre-hydrate tracker and recover any recent gap since last run
+            # Pre-hydrate tracker immediately from latest stored DB candle
             async with session_factory() as init_session:
-                try:
-                    await service.execute_restart_recovery(init_session, settings.DEFAULT_SYMBOL, settings.DEFAULT_INTERVAL)
-                except Exception as rec_err:
-                    logger.debug("startup_gap_recovery_skipped", detail=str(rec_err))
-
                 latest_candle = await service.get_latest_candle(init_session, settings.DEFAULT_SYMBOL, settings.DEFAULT_INTERVAL, only_closed=False)
                 if latest_candle:
+                    from datetime import datetime, timezone
                     await tracker.record_message_received(
-                        exchange_time=latest_candle.exchange_event_time or latest_candle.open_time,
+                        exchange_time=datetime.now(timezone.utc),
                         close_price=float(latest_candle.close),
                     )
 

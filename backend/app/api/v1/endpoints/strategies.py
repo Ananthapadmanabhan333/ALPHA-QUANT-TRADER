@@ -297,6 +297,9 @@ def _safe_float(val) -> Optional[float]:
         return None
 
 
+_scanner_cache: dict[tuple[str, str, float], tuple[float, LiveScannerResponseSchema]] = {}
+
+
 @router.get(
     "/live-scanner",
     response_model=LiveScannerResponseSchema,
@@ -313,6 +316,15 @@ async def get_live_strategy_scanner(
     computes real-time technical indicators, and generates actionable ATR-calibrated
     entry, stop-loss, take-profit, and position sizing setups for traders.
     """
+    import time as _time
+    from app.core.config import get_settings
+    settings = get_settings()
+    cache_key = (symbol.upper(), interval, round(account_equity, 2))
+    if settings.ENVIRONMENT != "testing":
+        cached = _scanner_cache.get(cache_key)
+        if cached and (_time.monotonic() - cached[0]) < 15.0:
+            return cached[1]
+
     candles = await market_service.get_candles(
         db=db,
         symbol=symbol,
@@ -321,17 +333,8 @@ async def get_live_strategy_scanner(
         only_closed=True,
     )
 
-    from app.core.config import get_settings
-    settings = get_settings()
     if settings.ENVIRONMENT != "testing":
-        needs_sync = not candles or len(candles) < 60
-        if candles:
-            latest_open = candles[-1].open_time
-            if latest_open.tzinfo is None:
-                latest_open = latest_open.replace(tzinfo=timezone.utc)
-            if (datetime.now(timezone.utc) - latest_open).total_seconds() > 90:
-                needs_sync = True
-        if needs_sync:
+        if not candles or len(candles) < 60:
             try:
                 fresh_klines = await market_service.rest_adapter.fetch_klines(
                     symbol=symbol, interval=interval, limit=160
@@ -503,7 +506,7 @@ async def get_live_strategy_scanner(
     else:
         consensus_side = "HOLD"
 
-    return LiveScannerResponseSchema(
+    resp = LiveScannerResponseSchema(
         symbol=symbol,
         interval=interval,
         timestamp=datetime.now(timezone.utc),
@@ -527,4 +530,8 @@ async def get_live_strategy_scanner(
         ),
         setups=setups,
     )
+    if settings.ENVIRONMENT != "testing":
+        _scanner_cache[cache_key] = (_time.monotonic(), resp)
+    return resp
+
 

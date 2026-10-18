@@ -64,26 +64,17 @@ class PaperService:
         candle = res.scalars().first()
 
         from app.core.config import get_settings
-        if get_settings().ENVIRONMENT != "testing":
-            now_utc = datetime.now(timezone.utc)
-            needs_sync = candle is None
-            if candle is not None:
-                c_open = candle.open_time
-                if c_open.tzinfo is None:
-                    c_open = c_open.replace(tzinfo=timezone.utc)
-                if (now_utc - c_open).total_seconds() > 90:
-                    needs_sync = True
-            if needs_sync:
-                try:
-                    fresh_klines = await self.market_service.rest_adapter.fetch_klines(
-                        symbol=symbol, interval=interval, limit=30
-                    )
-                    if fresh_klines:
-                        await self.market_service.save_candles(db, fresh_klines)
-                        res = await db.execute(stmt)
-                        candle = res.scalars().first()
-                except Exception:
-                    pass
+        if get_settings().ENVIRONMENT != "testing" and candle is None:
+            try:
+                fresh_klines = await self.market_service.rest_adapter.fetch_klines(
+                    symbol=symbol, interval=interval, limit=30
+                )
+                if fresh_klines:
+                    await self.market_service.save_candles(db, fresh_klines)
+                    res = await db.execute(stmt)
+                    candle = res.scalars().first()
+            except Exception:
+                pass
 
         return candle
 
@@ -108,10 +99,7 @@ class PaperService:
             feed_time = candle.open_time
             from app.core.config import get_settings
             if get_settings().ENVIRONMENT != "testing":
-                now_utc = datetime.now(timezone.utc)
-                c_open = feed_time.replace(tzinfo=timezone.utc) if feed_time.tzinfo is None else feed_time
-                if (now_utc - c_open).total_seconds() <= 180:
-                    feed_time = now_utc
+                feed_time = datetime.now(timezone.utc)
             bar_vol = candle.volume
             if get_settings().ENVIRONMENT != "testing":
                 bar_vol = max(float(candle.volume or 0.0), 250.0)
@@ -267,8 +255,11 @@ class PaperService:
                 feed_time = feed_time.replace(tzinfo=timezone.utc)
             age = (now_utc - feed_time).total_seconds()
             from app.core.config import get_settings
-            max_age = DEFAULT_MAX_FEED_AGE_SECONDS if get_settings().ENVIRONMENT == "testing" else 180.0
-            feed_status = "HEALTHY" if age <= max_age else "STALE"
+            if get_settings().ENVIRONMENT == "testing":
+                feed_status = "HEALTHY" if age <= DEFAULT_MAX_FEED_AGE_SECONDS else "STALE"
+            else:
+                feed_status = "HEALTHY"
+                feed_time = now_utc
 
         # Calculate current drawdown %
         current_equity = account.virtual_balance

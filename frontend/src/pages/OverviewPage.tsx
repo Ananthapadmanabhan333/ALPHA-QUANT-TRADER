@@ -70,50 +70,47 @@ export const OverviewPage: React.FC = () => {
   const loadOverviewData = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // Phase 1: Critical fast desk telemetry (renders immediately)
       const [
-        candlesRes,
-        mktStatusRes,
         portfolioRes,
-        riskRes,
-        orchRes,
-        eventsRes,
-        healthRes,
-        readyRes,
-        experimentsRes,
+        mktStatusRes,
         scannerRes,
+        riskRes,
+        candlesRes,
       ] = await Promise.all([
-        fetchCandles('BTCUSDT', '1m', 20, false).catch(() => ({ candles: [] as MarketCandle[] })),
-        fetchMarketStatus('BTCUSDT', '1m').catch(() => null),
         fetchPortfolio('BTCUSDT').catch(() => null),
+        fetchMarketStatus('BTCUSDT', '1m').catch(() => null),
+        fetchLiveScanner('BTCUSDT', scannerInterval, 10000.0).catch(() => null),
         fetchRiskStatus('BTCUSDT').catch(() => null),
+        fetchCandles('BTCUSDT', '1m', 20, false).catch(() => ({ candles: [] as MarketCandle[] })),
+      ]);
+
+      if (portfolioRes) setPortfolio(portfolioRes);
+      if (mktStatusRes) setMarketStatus(mktStatusRes);
+      if (scannerRes) setLiveScanner(scannerRes);
+      if (riskRes) setRiskStatus(riskRes);
+      if (candlesRes && 'candles' in candlesRes) {
+        setCandles(candlesRes.candles);
+      }
+
+      // Phase 2: Secondary operational status & audit telemetry (non-blocking)
+      Promise.all([
         fetchPaperTradingStatus().catch(() => null),
         fetchSystemEvents(undefined, undefined, 10, 0).catch(() => ({ items: [] as SystemEvent[] })),
         fetchHealth().catch(() => null),
         fetchReadiness().catch(() => null),
         fetchExperiments(undefined, 'BTCUSDT', 1).catch(() => ({ experiments: [] })),
-        fetchLiveScanner('BTCUSDT', scannerInterval, 10000.0).catch(() => null),
-      ]);
-
-      if (candlesRes && 'candles' in candlesRes) {
-        setCandles(candlesRes.candles);
-      }
-      setMarketStatus(mktStatusRes);
-      setPortfolio(portfolioRes);
-      setRiskStatus(riskRes);
-      setOrchestratorStatus(orchRes);
-      if (eventsRes && 'items' in eventsRes) {
-        setEvents(eventsRes.items);
-      }
-      setHealth(healthRes);
-      setReadiness(readyRes);
-      if (scannerRes) {
-        setLiveScanner(scannerRes);
-      }
-
-      // Extract recent signals if present
-      if (experimentsRes?.experiments?.[0]?.signals) {
-        setRecentSignals(experimentsRes.experiments[0].signals.slice(-10).reverse());
-      }
+      ]).then(([orchRes, eventsRes, healthRes, readyRes, experimentsRes]) => {
+        if (orchRes) setOrchestratorStatus(orchRes);
+        if (eventsRes && 'items' in eventsRes) {
+          setEvents(eventsRes.items);
+        }
+        if (healthRes) setHealth(healthRes);
+        if (readyRes) setReadiness(readyRes);
+        if (experimentsRes?.experiments?.[0]?.signals) {
+          setRecentSignals(experimentsRes.experiments[0].signals.slice(-10).reverse());
+        }
+      });
 
       setLastRefreshedAt(new Date());
       setError(null);
@@ -149,7 +146,7 @@ export const OverviewPage: React.FC = () => {
 
   useEffect(() => {
     loadOverviewData();
-    const intervalId = window.setInterval(loadOverviewData, 5000);
+    const intervalId = window.setInterval(loadOverviewData, 15000);
     return () => clearInterval(intervalId);
   }, [loadOverviewData]);
 
