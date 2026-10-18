@@ -3,6 +3,7 @@ from app.core.config import Settings
 
 def test_settings_default_values():
     settings = Settings(
+        _env_file=None,
         ENVIRONMENT="development",
         PROJECT_NAME="ALPHA Quant",
         VERSION="1.0.0",

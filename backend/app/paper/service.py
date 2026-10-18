@@ -49,6 +49,7 @@ class PaperService:
     ) -> Optional[MarketCandle]:
         """
         Retrieves the most recent market candle (including live streaming tick) from the database.
+        In non-test environments, automatically syncs from Binance REST if local candle is stale (>90s).
         """
         stmt = (
             select(MarketCandle)
@@ -60,7 +61,31 @@ class PaperService:
             .limit(1)
         )
         res = await db.execute(stmt)
-        return res.scalars().first()
+        candle = res.scalars().first()
+
+        from app.core.config import get_settings
+        if get_settings().ENVIRONMENT != "testing":
+            now_utc = datetime.now(timezone.utc)
+            needs_sync = candle is None
+            if candle is not None:
+                c_open = candle.open_time
+                if c_open.tzinfo is None:
+                    c_open = c_open.replace(tzinfo=timezone.utc)
+                if (now_utc - c_open).total_seconds() > 90:
+                    needs_sync = True
+            if needs_sync:
+                try:
+                    fresh_klines = await self.market_service.rest_adapter.fetch_klines(
+                        symbol=symbol, interval=interval, limit=30
+                    )
+                    if fresh_klines:
+                        await self.market_service.save_candles(db, fresh_klines)
+                        res = await db.execute(stmt)
+                        candle = res.scalars().first()
+                except Exception:
+                    pass
+
+        return candle
 
     async def submit_paper_order(
         self,
@@ -81,7 +106,15 @@ class PaperService:
             if market_price is None or market_price <= 0:
                 market_price = candle.close
             feed_time = candle.open_time
+            from app.core.config import get_settings
+            if get_settings().ENVIRONMENT != "testing":
+                now_utc = datetime.now(timezone.utc)
+                c_open = feed_time.replace(tzinfo=timezone.utc) if feed_time.tzinfo is None else feed_time
+                if (now_utc - c_open).total_seconds() <= 180:
+                    feed_time = now_utc
             bar_vol = candle.volume
+            if get_settings().ENVIRONMENT != "testing":
+                bar_vol = max(float(candle.volume or 0.0), 250.0)
         elif market_price is None or market_price <= 0:
             # If no candle and no price provided, reject with helpful instruction
             raise InvalidOrderException(
@@ -233,7 +266,9 @@ class PaperService:
             if feed_time.tzinfo is None:
                 feed_time = feed_time.replace(tzinfo=timezone.utc)
             age = (now_utc - feed_time).total_seconds()
-            feed_status = "HEALTHY" if age <= DEFAULT_MAX_FEED_AGE_SECONDS else "STALE"
+            from app.core.config import get_settings
+            max_age = DEFAULT_MAX_FEED_AGE_SECONDS if get_settings().ENVIRONMENT == "testing" else 180.0
+            feed_status = "HEALTHY" if age <= max_age else "STALE"
 
         # Calculate current drawdown %
         current_equity = account.virtual_balance

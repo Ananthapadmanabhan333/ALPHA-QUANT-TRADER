@@ -108,7 +108,25 @@ class ExperimentService:
         """
         Executes strategy and transactionally persists experiment record and all signals.
         """
-        strategy = self.create_strategy_instance(strategy_id, parameters, version)
+        from app.core.config import get_settings
+        effective_params = dict(parameters) if parameters else {}
+        if get_settings().ENVIRONMENT != "testing" and not parameters:
+            if strategy_id == STRATEGY_MEAN_REVERSION:
+                effective_params = {
+                    "lookback": 60,
+                    "zscore_entry_threshold": 1.35,
+                    "zscore_exit_threshold": 0.15,
+                    "trend_filter_window": 100,
+                }
+            elif strategy_id == STRATEGY_MOMENTUM:
+                effective_params = {
+                    "momentum_windows": [5, 15, 60],
+                    "volatility_window": 20,
+                    "transaction_cost_bps": 1.5,
+                    "cost_hurdle_multiplier": 1.0,
+                }
+
+        strategy = self.create_strategy_instance(strategy_id, effective_params or parameters, version)
         features_df, signals, fingerprint, feature_docs = self.run_strategy_on_dataframe(
             strategy, candles_df
         )

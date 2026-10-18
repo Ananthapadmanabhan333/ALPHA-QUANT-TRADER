@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
+import os
+os.environ["ENVIRONMENT"] = "testing"
+
 from app.core.config import Settings, get_settings
+get_settings.cache_clear()
 from app.db.base import Base
 from app.db.session import get_db, set_engine
 from app.main import create_app
@@ -17,6 +21,7 @@ from app.main import create_app
 
 @pytest.fixture(scope="session")
 def test_settings() -> Settings:
+    get_settings.cache_clear()
     return Settings(
         ENVIRONMENT="testing",
         PROJECT_NAME="ALPHA Quant Test",

@@ -55,6 +55,27 @@ class BacktestService:
             only_closed=True,
         )
 
+        from app.core.config import get_settings
+        if get_settings().ENVIRONMENT != "testing" and request.start_time is None and request.end_time is None:
+            if not candles or len(candles) < 300:
+                try:
+                    fresh_klines = await self.market_service.rest_adapter.fetch_klines(
+                        symbol=request.symbol, interval=request.interval, limit=max(request.limit, 500)
+                    )
+                    if fresh_klines:
+                        await self.market_service.save_candles(db, fresh_klines)
+                        candles = await self.market_service.get_candles(
+                            db=db,
+                            symbol=request.symbol,
+                            interval=request.interval,
+                            start_time=request.start_time,
+                            end_time=request.end_time,
+                            limit=request.limit,
+                            only_closed=True,
+                        )
+                except Exception:
+                    pass
+
         if not candles:
             raise InsufficientDataException(
                 f"No finalized candles found for {request.symbol} ({request.interval}). Please ingest market data first."
@@ -70,7 +91,8 @@ class BacktestService:
             version=request.strategy_version,
         )
 
-        cost_model = CostModel.from_dict(request.cost_model or {})
+        cost_cfg = request.cost_model or request.cost_assumptions or {}
+        cost_model = CostModel.from_dict(cost_cfg)
 
         # 4. Execute Backtest Engine
         engine = BacktestEngine(
@@ -79,11 +101,13 @@ class BacktestService:
             execution_delay_bars=request.execution_delay_bars,
             initial_cash=request.initial_cash,
         )
-        result = engine.run(strategy, candles_df, run_stress_tests=True)
+        result = engine.run(strategy, candles_df, run_stress_tests=request.stress_scenarios)
 
         # 5. Persist BacktestRun Record
         run_id = str(uuid.uuid4())
         perf_dict = result.performance.to_dict()
+        perf_dict["regime_performance"] = result.regime_performance
+        perf_dict["stress_test_results"] = result.stress_test_results
 
         # Downsample equity curve if very large to prevent giant JSON payload
         eq_snapshots = result.equity_curve

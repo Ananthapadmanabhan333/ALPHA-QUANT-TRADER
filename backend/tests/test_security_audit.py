@@ -1,44 +1,25 @@
 """
 ALPHA Quant — Phase 8: Automated Security Invariants & Compliance Audit Tests.
-Verifies critical security and non-execution invariants:
-1. Zero live trading clients or order-routing adapters exist in the repository.
-2. No live withdrawal, exchange API secret, or real fund movement endpoints exist.
-3. Database schemas strictly contain only simulated/paper accounts, orders, and fills.
-4. Mutating REST endpoints are protected and validate administrative API keys.
-5. Central Risk Gate cannot be bypassed by client requests or query parameters.
+Verifies critical security and non-execution invariants.
 """
 
-import inspect
-from decimal import Decimal
+from datetime import datetime, timezone
+import os
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 
 import app
 from app.core.config import get_settings
 from app.db.base import Base
-from app.paper.broker import PaperBroker
-from app.paper.models import PaperSide, PaperOrderType
-from app.paper.risk_gate import CentralRiskGate
+from app.models.paper import PaperAccount, PaperRiskState
+from app.paper.constants import OrderSide, OrderType
 from app.paper.exceptions import RiskBreachException
+from app.paper.risk_gate import CentralRiskGate
+from app.paper.schemas import PaperOrderCreateRequest
 
 
 def test_security_invariant_1_no_live_trading_client():
     """Verify that no live trading exchange client or execution gateway exists."""
-    forbidden_terms = [
-        "ccxt.binance",
-        "create_order",
-        "place_live_order",
-        "cancel_live_order",
-        "withdraw",
-        "create_withdrawal",
-        "api_secret",
-        "binance_secret",
-        "binance_api_key",
-    ]
-
-    # Inspect all module files in app package
-    import os
     app_dir = os.path.dirname(app.__file__)
     for root, _, files in os.walk(app_dir):
         for f in files:
@@ -46,7 +27,6 @@ def test_security_invariant_1_no_live_trading_client():
                 path = os.path.join(root, f)
                 with open(path, "r", encoding="utf-8") as file:
                     content = file.read()
-                    # Check that withdrawal or live order methods do not exist
                     assert "create_withdrawal" not in content.lower()
                     assert "wallet_withdraw" not in content.lower()
                     assert "binance_secret" not in content.lower()
@@ -55,13 +35,11 @@ def test_security_invariant_1_no_live_trading_client():
 def test_security_invariant_2_database_tables_are_strictly_paper():
     """Verify that all financial models in SQLAlchemy are strictly paper/simulated."""
     table_names = list(Base.metadata.tables.keys())
-    # Verify tables
     assert "paper_accounts" in table_names
     assert "paper_orders" in table_names
     assert "paper_fills" in table_names
     assert "paper_positions" in table_names
 
-    # Verify no table exists for live exchange credentials or live accounts
     for name in table_names:
         assert "live_account" not in name
         assert "exchange_credential" not in name
@@ -69,24 +47,36 @@ def test_security_invariant_2_database_tables_are_strictly_paper():
         assert "wallet" not in name
 
 
-@pytest.mark.asyncio
-async def test_security_invariant_3_frontend_cannot_bypass_risk_gate(test_session: AsyncSession):
+def test_security_invariant_3_frontend_cannot_bypass_risk_gate():
     """Verify that order submission always passes through the Central Risk Gate."""
-    broker = PaperBroker()
-    account = await broker.get_or_create_account(test_session, "test_bypass_acc")
+    account = PaperAccount(virtual_balance=50000.0)
+    risk_state = PaperRiskState(
+        max_order_notional=10000.0,
+        max_position_pct=0.50,
+        max_portfolio_exposure_pct=0.80,
+        starting_daily_equity=50000.0,
+        peak_equity=50000.0,
+        last_daily_reset=datetime.now(timezone.utc),
+    )
     risk_gate = CentralRiskGate()
+    req = PaperOrderCreateRequest(
+        symbol="BTCUSDT",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=0.3,
+        current_market_price=50000.0,
+    )
 
-    # Attempting to submit order with notional $15,000 (exceeds $10,000 max order notional)
     with pytest.raises(RiskBreachException) as exc:
-        await risk_gate.validate_order(
+        risk_gate.check_pre_trade_invariants(
+            request=req,
             account=account,
-            symbol="BTCUSDT",
-            side=PaperSide.BUY,
-            order_type=PaperOrderType.MARKET,
-            quantity=Decimal("0.3"), # 0.3 * $50,000 = $15,000
-            current_market_price=Decimal("50000.00"),
+            risk_state=risk_state,
+            current_position=None,
+            current_price=50000.0,
+            latest_feed_time=datetime.now(timezone.utc),
         )
-    assert "MAX_ORDER_NOTIONAL" in str(exc.value)
+    assert exc.value.rule_name == "MAX_ORDER_NOTIONAL"
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,13 @@ import {
   AlertTriangle,
   Radio,
 } from 'lucide-react';
-import { fetchCandles, fetchMarketStatus, fetchExperiments, triggerMarketBackfill } from '../services/api';
+import {
+  fetchCandles,
+  fetchMarketStatus,
+  fetchExperiments,
+  fetchExperimentDetails,
+  triggerMarketBackfill,
+} from '../services/api';
 import { MarketCandle, MarketStatusResponse, StrategySignal } from '../types';
 import { EmptyState } from '../components/common/EmptyState';
 
@@ -64,8 +70,16 @@ export const MarketsPage: React.FC = () => {
       setCandles(candlesRes.candles);
       setStatus(statusRes);
 
-      if (expRes.experiments?.[0]?.signals) {
-        setSignals(expRes.experiments[0].signals);
+      const firstExp = expRes.experiments?.[0];
+      if (firstExp) {
+        if (firstExp.signals && firstExp.signals.length > 0) {
+          setSignals(firstExp.signals);
+        } else {
+          const detailed = await fetchExperimentDetails(firstExp.id).catch(() => null);
+          if (detailed?.signals) {
+            setSignals(detailed.signals);
+          }
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to query market data');

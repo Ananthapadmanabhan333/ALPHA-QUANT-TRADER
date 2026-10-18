@@ -18,7 +18,7 @@ if str(BACKEND_DIR) not in sys.path:
 # Configure serverless-safe writable SQLite database in /tmp
 TMP_DIR = Path("/tmp")
 if TMP_DIR.is_dir():
-    tmp_db = TMP_DIR / "alpha_quant.db"
+    tmp_db = TMP_DIR / "alpha_quant_v3.db"
     bundled_db = BACKEND_DIR / "alpha_quant.db"
     if not tmp_db.exists() and bundled_db.exists():
         try:

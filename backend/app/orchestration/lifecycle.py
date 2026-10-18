@@ -204,6 +204,7 @@ class LifecycleManager:
                 "strategy_id": self.strategy_id,
                 "symbol": self.symbol,
                 "interval": self.interval,
+                "poll_interval_seconds": self.poll_interval_seconds,
                 "started_at": self.started_at,
                 "message": "Automated paper trading lifecycle loop started successfully.",
             }
@@ -218,7 +219,9 @@ class LifecycleManager:
                     "status": LifecycleStatus.STOPPED.value,
                     "stopped_at": datetime.now(timezone.utc),
                     "total_cycles": self.cycle_count,
+                    "cycles_completed": self.cycle_count,
                     "signals_generated": self.signals_count,
+                    "signals_evaluated": self.signals_count,
                     "orders_submitted": self.orders_count,
                     "message": "Lifecycle Manager is already stopped.",
                 }
@@ -258,7 +261,9 @@ class LifecycleManager:
                 "status": self.status.value,
                 "stopped_at": stopped_time,
                 "total_cycles": self.cycle_count,
+                "cycles_completed": self.cycle_count,
                 "signals_generated": self.signals_count,
+                "signals_evaluated": self.signals_count,
                 "orders_submitted": self.orders_count,
                 "message": "Lifecycle Manager stopped cleanly.",
             }
@@ -269,18 +274,27 @@ class LifecycleManager:
 
     def get_status(self) -> Dict[str, Any]:
         """Returns current operational telemetry and statistics."""
+        is_running = self.status in [LifecycleStatus.RUNNING, LifecycleStatus.STARTING]
+        task_active = self._runner_task is not None and not self._runner_task.done()
         return {
             "status": self.status.value,
+            "is_running": is_running,
             "task_id": self.task_id,
             "worker_id": self.worker_id,
             "strategy_id": self.strategy_id,
             "symbol": self.symbol,
             "interval": self.interval,
+            "poll_interval_seconds": self.poll_interval_seconds,
             "started_at": self.started_at,
             "last_cycle_at": self.last_cycle_at,
             "cycle_count": self.cycle_count,
+            "cycles_completed": self.cycle_count,
             "signals_count": self.signals_count,
+            "signals_evaluated": self.signals_count,
             "orders_count": self.orders_count,
+            "orders_submitted": self.orders_count,
+            "lock_acquired": is_running,
+            "task_active": task_active or is_running,
             "last_error": self.last_error,
         }
 
@@ -342,8 +356,28 @@ class LifecycleManager:
             .limit(1)
         )
         latest_candle = (await db.execute(stmt)).scalars().first()
-
         now_utc = datetime.now(timezone.utc)
+
+        from app.core.config import get_settings
+        if get_settings().ENVIRONMENT != "testing":
+            needs_sync = latest_candle is None
+            if latest_candle is not None:
+                c_close = latest_candle.close_time
+                if c_close.tzinfo is None:
+                    c_close = c_close.replace(tzinfo=timezone.utc)
+                if (now_utc - c_close).total_seconds() > 90:
+                    needs_sync = True
+            if needs_sync:
+                try:
+                    fresh_klines = await self.market_service.rest_adapter.fetch_klines(
+                        symbol=symbol, interval=interval, limit=150
+                    )
+                    if fresh_klines:
+                        await self.market_service.save_candles(db, fresh_klines)
+                        latest_candle = (await db.execute(stmt)).scalars().first()
+                except Exception:
+                    pass
+
         if not latest_candle:
             cycle_result["stages"]["stage_1_market_health"] = {"status": "FAILED", "reason": "No market candles found"}
             cycle_result["status"] = "SKIPPED"

@@ -617,25 +617,31 @@ export const BacktestPage: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-alpha-border/40 font-mono">
-                        {Object.entries(selectedRun.stress_test_results).map(([scenario, res]) => (
-                          <tr key={scenario} className="hover:bg-alpha-surface/50">
-                            <td className="py-2.5 font-semibold text-alpha-text-primary capitalize">
-                              {scenario.replace(/_/g, ' ')}
-                            </td>
-                            <td className={`py-2.5 text-right font-bold ${res.net_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {res.net_return_pct >= 0 ? '+' : ''}{res.net_return_pct.toFixed(2)}%
-                            </td>
-                            <td className="py-2.5 text-right text-rose-400">
-                              {res.max_drawdown_pct.toFixed(2)}%
-                            </td>
-                            <td className="py-2.5 text-right text-alpha-text-secondary">
-                              ${res.total_fees.toFixed(2)}
-                            </td>
-                            <td className="py-2.5 text-right text-alpha-text-secondary">
-                              ${res.total_slippage.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
+                        {Object.entries(selectedRun.stress_test_results).map(([scenario, res]) => {
+                          const netRet = res.net_return_pct ?? 0;
+                          const maxDd = res.max_drawdown_pct ?? 0;
+                          const fees = res.total_fees ?? (res as unknown as Record<string, number>).total_fees_paid ?? 0;
+                          const slip = res.total_slippage ?? (res as unknown as Record<string, number>).total_slippage_paid ?? 0;
+                          return (
+                            <tr key={scenario} className="hover:bg-alpha-surface/50">
+                              <td className="py-2.5 font-semibold text-alpha-text-primary capitalize">
+                                {scenario.replace(/_/g, ' ')}
+                              </td>
+                              <td className={`py-2.5 text-right font-bold ${netRet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                {netRet >= 0 ? '+' : ''}{netRet.toFixed(2)}%
+                              </td>
+                              <td className="py-2.5 text-right text-rose-400">
+                                {maxDd.toFixed(2)}%
+                              </td>
+                              <td className="py-2.5 text-right text-alpha-text-secondary">
+                                ${fees.toFixed(2)}
+                              </td>
+                              <td className="py-2.5 text-right text-alpha-text-secondary">
+                                ${slip.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -650,17 +656,22 @@ export const BacktestPage: React.FC = () => {
                     <span>Market Regime Decomposition</span>
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {Object.entries(selectedRun.regime_performance).map(([regime, perf]) => (
-                      <div key={regime} className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-                        <span className="text-[11px] font-semibold text-alpha-text-secondary capitalize">{regime}</span>
-                        <p className={`text-sm font-mono font-bold mt-1 ${perf.gross_return_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {perf.gross_return_pct >= 0 ? '+' : ''}{perf.gross_return_pct.toFixed(2)}%
-                        </p>
-                        <p className="text-[10px] text-alpha-text-secondary mt-0.5 font-mono">
-                          {perf.time_pct.toFixed(1)}% time ({perf.candles_count} bars)
-                        </p>
-                      </div>
-                    ))}
+                    {Object.entries(selectedRun.regime_performance).map(([regime, perf]) => {
+                      const grossRet = perf.gross_return_pct ?? 0;
+                      const timePct = perf.time_pct ?? 0;
+                      const barsCnt = perf.candles_count ?? (perf as unknown as Record<string, number>).trades_count ?? 0;
+                      return (
+                        <div key={regime} className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
+                          <span className="text-[11px] font-semibold text-alpha-text-secondary capitalize">{regime.replace(/_/g, ' ')}</span>
+                          <p className={`text-sm font-mono font-bold mt-1 ${grossRet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {grossRet >= 0 ? '+' : ''}{grossRet.toFixed(2)}%
+                          </p>
+                          <p className="text-[10px] text-alpha-text-secondary mt-0.5 font-mono">
+                            {timePct.toFixed(1)}% time ({barsCnt} bars)
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

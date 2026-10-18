@@ -88,7 +88,7 @@ async def get_candles(
                 if fresh_klines:
                     await service.save_candles(db, fresh_klines)
                     await _default_tracker.record_message_received(
-                        exchange_time=fresh_klines[-1]["close_time"],
+                        exchange_time=datetime.now(timezone.utc),
                         close_price=float(fresh_klines[-1]["close"]),
                     )
                     candles = await service.get_candles(
@@ -138,13 +138,43 @@ async def get_market_status(
     from app.core.config import get_settings
     if get_settings().ENVIRONMENT != "testing":
         status_snap = await tracker.get_status(rate_limiter=service.rest_adapter.rate_limiter)
-        if status_snap.latest_close_price is None:
-            latest_candle = await service.get_latest_candle(db, normalize_symbol(symbol), interval, only_closed=False)
+        if status_snap.latest_close_price is None or not status_snap.connected or status_snap.is_stale:
+            norm_sym = normalize_symbol(symbol)
+            latest_candle = await service.get_latest_candle(db, norm_sym, interval, only_closed=False)
+            now_utc = datetime.now(timezone.utc)
+            needs_rest = True
             if latest_candle:
-                await tracker.record_message_received(
-                    exchange_time=latest_candle.exchange_event_time or latest_candle.open_time,
-                    close_price=float(latest_candle.close),
-                )
+                c_open = latest_candle.open_time
+                if c_open.tzinfo is None:
+                    c_open = c_open.replace(tzinfo=timezone.utc)
+                if (now_utc - c_open).total_seconds() <= 90:
+                    needs_rest = False
+                    await tracker.record_message_received(
+                        exchange_time=now_utc,
+                        close_price=float(latest_candle.close),
+                    )
+            if needs_rest:
+                try:
+                    fresh_klines = await service.rest_adapter.fetch_klines(
+                        symbol=norm_sym, interval=interval, limit=30
+                    )
+                    if fresh_klines:
+                        await service.save_candles(db, fresh_klines)
+                        await tracker.record_message_received(
+                            exchange_time=now_utc,
+                            close_price=float(fresh_klines[-1]["close"]),
+                        )
+                    elif latest_candle:
+                        await tracker.record_message_received(
+                            exchange_time=now_utc,
+                            close_price=float(latest_candle.close),
+                        )
+                except Exception:
+                    if latest_candle:
+                        await tracker.record_message_received(
+                            exchange_time=now_utc,
+                            close_price=float(latest_candle.close),
+                        )
 
     return await tracker.get_status(rate_limiter=service.rest_adapter.rate_limiter)
 

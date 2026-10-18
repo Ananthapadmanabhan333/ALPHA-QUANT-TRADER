@@ -52,14 +52,21 @@ class MarketDataService:
         dialect_name = bind.dialect.name if bind else "postgresql"
         insert_fn = sqlite_insert if dialect_name == "sqlite" else pg_insert
 
-        # Prepare values for batch insert/upsert
-        records_to_insert = []
+        # Prepare deduplicated values for batch insert/upsert
+        deduped_records: Dict[Tuple[str, str, datetime], Dict[str, Any]] = {}
         for c in candles:
-            records_to_insert.append({
+            open_dt = c["open_time"]
+            if isinstance(open_dt, datetime) and open_dt.tzinfo is None:
+                open_dt = open_dt.replace(tzinfo=timezone.utc)
+            close_dt = c["close_time"]
+            if isinstance(close_dt, datetime) and close_dt.tzinfo is None:
+                close_dt = close_dt.replace(tzinfo=timezone.utc)
+            key = (c["symbol"], c["interval"], open_dt)
+            deduped_records[key] = {
                 "symbol": c["symbol"],
                 "interval": c["interval"],
-                "open_time": c["open_time"],
-                "close_time": c["close_time"],
+                "open_time": open_dt,
+                "close_time": close_dt,
                 "open": c["open"],
                 "high": c["high"],
                 "low": c["low"],
@@ -73,8 +80,9 @@ class MarketDataService:
                 "source": c.get("source", "binance_spot"),
                 "exchange_event_time": c.get("exchange_event_time"),
                 "ingested_at": c.get("ingested_at", datetime.now(timezone.utc)),
-            })
+            }
 
+        records_to_insert = list(deduped_records.values())
         stmt = insert_fn(MarketCandle).values(records_to_insert)
         upsert_stmt = stmt.on_conflict_do_update(
             index_elements=["symbol", "interval", "open_time"],
@@ -96,7 +104,7 @@ class MarketDataService:
 
         await db.execute(upsert_stmt)
         await db.commit()
-        db.expire_all()
+        db.expunge_all()
 
         saved_count = len(records_to_insert)
         await self.tracker.record_candles_saved(saved_count)

@@ -51,6 +51,8 @@ class MarketFeedTracker:
         close_price: float,
     ) -> None:
         async with self._lock:
+            self.connected = True
+            self.is_streaming = True
             self.messages_received += 1
             self.last_exchange_time = exchange_time
             self.last_ingested_at = datetime.now(timezone.utc)

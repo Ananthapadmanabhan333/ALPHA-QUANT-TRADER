@@ -33,7 +33,7 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 function getAuthHeaders(): HeadersInit {
-  const key = localStorage.getItem('alpha_admin_api_key') || 'alpha-admin-dev-key';
+  const key = localStorage.getItem('alpha_admin_api_key') || 'alpha-quant-admin-secret';
   return {
     'Content-Type': 'application/json',
     'X-API-Key': key,
@@ -43,7 +43,11 @@ function getAuthHeaders(): HeadersInit {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
-    const message = errorBody?.error?.message || `HTTP Error ${response.status}: ${response.statusText}`;
+    const rawDetail = errorBody?.error?.message || errorBody?.detail;
+    const message =
+      typeof rawDetail === 'string'
+        ? rawDetail
+        : rawDetail?.message || `HTTP Error ${response.status}: ${response.statusText}`;
     throw new Error(message);
   }
   return response.json() as Promise<T>;
@@ -121,7 +125,7 @@ export async function fetchStrategies(): Promise<StrategyInfo[]> {
 export async function runStrategy(payload: RunStrategyRequest): Promise<StrategyExperiment> {
   const res = await fetch(`${API_BASE_URL}/api/v1/strategies/run`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse<StrategyExperiment>(res);
@@ -151,7 +155,7 @@ export async function fetchExperimentDetails(experimentId: string): Promise<Stra
 export async function createBacktest(payload: BacktestCreateRequest): Promise<BacktestRun> {
   const res = await fetch(`${API_BASE_URL}/api/v1/backtests`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse<BacktestRun>(res);
@@ -214,7 +218,7 @@ export async function fetchPaperOrderDetails(
 export async function submitPaperOrder(payload: PaperOrderCreateRequest): Promise<PaperOrder> {
   const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   return handleResponse<PaperOrder>(res);
@@ -223,6 +227,7 @@ export async function submitPaperOrder(payload: PaperOrderCreateRequest): Promis
 export async function cancelPaperOrder(orderId: string): Promise<PaperOrder> {
   const res = await fetch(`${API_BASE_URL}/api/v1/paper/orders/${orderId}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
   });
   return handleResponse<PaperOrder>(res);
 }

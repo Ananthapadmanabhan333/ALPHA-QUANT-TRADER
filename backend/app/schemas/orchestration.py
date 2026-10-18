@@ -18,6 +18,13 @@ class PaperTradingStartRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = Field(None, description="Optional custom strategy hyperparameter overrides")
     is_live: bool = Field(False, description="Explicit safety flag. Must remain False.")
 
+    @field_validator("order_size_pct", mode="before")
+    @classmethod
+    def normalize_order_size_pct(cls, v: Any) -> Any:
+        if isinstance(v, (int, float)) and 0.10 < v <= 10.0:
+            return round(float(v) / 100.0, 6)
+        return v
+
     @field_validator("is_live")
     @classmethod
     def reject_live_execution(cls, v: bool) -> bool:
@@ -34,6 +41,7 @@ class PaperTradingStartResponse(BaseModel):
     strategy_id: str = Field(..., description="Active strategy ID")
     symbol: str = Field(..., description="Target market symbol")
     interval: str = Field(..., description="Bar interval")
+    poll_interval_seconds: float = Field(5.0, description="Polling interval in seconds")
     started_at: datetime = Field(..., description="UTC startup timestamp")
     message: str = Field(..., description="Status summary")
 
@@ -43,7 +51,9 @@ class PaperTradingStopResponse(BaseModel):
     status: str = Field(..., description="Orchestration status: STOPPED")
     stopped_at: datetime = Field(..., description="UTC shutdown timestamp")
     total_cycles: int = Field(..., description="Total execution cycles completed")
+    cycles_completed: int = Field(0, description="Total execution cycles completed (UI alias)")
     signals_generated: int = Field(..., description="Total quantitative signals generated")
+    signals_evaluated: int = Field(0, description="Total quantitative signals evaluated (UI alias)")
     orders_submitted: int = Field(..., description="Total simulated paper orders submitted")
     message: str = Field(..., description="Status summary")
 
@@ -51,16 +61,23 @@ class PaperTradingStopResponse(BaseModel):
 class PaperTradingStatusResponse(BaseModel):
     """Telemetry report for active or idle lifecycle manager."""
     status: str = Field(..., description="Current status: STOPPED, STARTING, RUNNING, PAUSED, STOPPING, ERROR")
+    is_running: bool = Field(False, description="Boolean flag indicating if runner is currently active")
     task_id: Optional[str] = Field(None, description="Active task ID if running")
     worker_id: str = Field(..., description="Task worker ID")
     strategy_id: Optional[str] = Field(None, description="Active strategy ID")
     symbol: str = Field(..., description="Trading symbol")
     interval: str = Field(..., description="Candle interval")
+    poll_interval_seconds: float = Field(5.0, description="Polling interval in seconds")
     started_at: Optional[datetime] = Field(None, description="Start time if active")
     last_cycle_at: Optional[datetime] = Field(None, description="Timestamp of most recent evaluation cycle")
     cycle_count: int = Field(0, description="Total completed cycles")
+    cycles_completed: int = Field(0, description="Total completed cycles (UI alias)")
     signals_count: int = Field(0, description="Signals produced")
+    signals_evaluated: int = Field(0, description="Signals evaluated (UI alias)")
     orders_count: int = Field(0, description="Orders placed")
+    orders_submitted: int = Field(0, description="Orders submitted (UI alias)")
+    lock_acquired: bool = Field(False, description="Whether single-worker ownership lock is held")
+    task_active: bool = Field(False, description="Whether background coroutine task is active")
     last_error: Optional[str] = Field(None, description="Last error message if encountered")
 
 

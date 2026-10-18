@@ -252,6 +252,7 @@ async def get_backtest_run(
         for s in run_record.equity_curve
     ]
 
+    metrics_dict = run_record.metrics or {}
     return BacktestRunResponse(
         id=run_record.id,
         strategy_id=run_record.strategy_id,
@@ -266,7 +267,7 @@ async def get_backtest_run(
         parameters=run_record.parameters,
         cost_assumptions=run_record.cost_assumptions,
         status=run_record.status,
-        metrics=run_record.metrics,
+        metrics=metrics_dict,
         total_trades=run_record.total_trades,
         net_return_pct=run_record.net_return_pct,
         sharpe_ratio=run_record.sharpe_ratio,
@@ -277,6 +278,8 @@ async def get_backtest_run(
         completed_at=run_record.completed_at,
         equity_curve=equity_resp,
         trades=trades_resp,
+        regime_performance=metrics_dict.get("regime_performance"),
+        stress_test_results=metrics_dict.get("stress_test_results"),
     )
 
 

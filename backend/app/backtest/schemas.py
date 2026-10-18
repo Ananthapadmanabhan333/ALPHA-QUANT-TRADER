@@ -12,10 +12,12 @@ class BacktestCreateRequest(BaseModel):
     parameters: Optional[Dict[str, Any]] = None
     initial_cash: float = Field(default=10000.0, ge=100.0)
     cost_model: Optional[Dict[str, Any]] = None
+    cost_assumptions: Optional[Dict[str, Any]] = None
+    stress_scenarios: bool = Field(default=True)
     execution_delay_bars: int = Field(default=0, ge=0, le=10)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    limit: int = Field(default=300, ge=30, le=2000)
+    limit: int = Field(default=500, ge=30, le=2000)
 
 
 class TradeResponseSchema(BaseModel):

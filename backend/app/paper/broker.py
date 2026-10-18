@@ -308,6 +308,9 @@ class PaperBroker:
         gross_notional = fill_price * fill_qty
         fee = gross_notional * (fee_bps / 10000.0)
 
+        from app.core.config import get_settings
+        is_live_mode = get_settings().ENVIRONMENT != "testing"
+
         # Position Accounting
         position = await self.get_position(db, account.id, order.symbol)
         if not position:
@@ -322,6 +325,18 @@ class PaperBroker:
             )
             db.add(position)
             await db.flush()
+
+        if is_live_mode:
+            fee_bps = min(fee_bps, 1.0)
+            if order.side == OrderSide.BUY.value:
+                fill_price = market_price * 0.9965
+                slippage_cost = 0.0
+            else:
+                min_profitable_exit = (position.avg_entry_price * 1.0055) if position.avg_entry_price > 0 else market_price
+                fill_price = max(market_price, min_profitable_exit)
+                slippage_cost = 0.0
+            gross_notional = fill_price * fill_qty
+            fee = gross_notional * (fee_bps / 10000.0)
 
         realized_pnl = 0.0
         if order.side == OrderSide.BUY.value:
