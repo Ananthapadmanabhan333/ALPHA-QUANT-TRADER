@@ -27,6 +27,7 @@ import {
   RiskResetResponse,
   SystemEvent,
   AsyncTaskResponse,
+  LiveScannerResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -351,5 +352,35 @@ export async function fetchAsyncTaskStatus(taskId: string): Promise<AsyncTaskRes
   const res = await fetch(`${API_BASE_URL}/api/v1/tasks/${taskId}`);
   return handleResponse<AsyncTaskResponse>(res);
 }
+
+export async function fetchLiveScanner(
+  symbol: string = 'BTCUSDT',
+  interval: string = '1m',
+  accountEquity: number = 10000.0,
+): Promise<LiveScannerResponse> {
+  const params = new URLSearchParams({
+    symbol,
+    interval,
+    account_equity: accountEquity.toString(),
+  });
+  const res = await fetch(`${API_BASE_URL}/api/v1/strategies/live-scanner?${params.toString()}`);
+  return handleResponse<LiveScannerResponse>(res);
+}
+
+export async function resetPaperAccount(
+  initialCash: number = 10000.0,
+  clearHistory: boolean = true,
+): Promise<PaperAccount> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/paper/account/reset`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      initial_cash: initialCash,
+      clear_history: clearHistory,
+    }),
+  });
+  return handleResponse<PaperAccount>(res);
+}
+
 
 

@@ -6,7 +6,7 @@ Orchestrates PaperBroker, MarketData feeds, risk evaluations, and read queries.
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 import uuid
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.market.service import MarketDataService
@@ -505,3 +505,48 @@ class PaperService:
         await db.commit()
 
         return await self.get_risk_status(db)
+
+    async def reset_paper_account(
+        self,
+        db: AsyncSession,
+        initial_cash: float = 10000.0,
+        clear_history: bool = True,
+    ) -> PaperAccountResponse:
+        """
+        Resets the virtual paper trading account to a specified starting capital,
+        flattens simulated positions, resets risk state counters, and optionally clears order history.
+        """
+        account = await self.broker.get_or_create_default_account(db)
+        risk_state = await self.broker.get_account_risk_state(db, account.id)
+
+        # Clear open positions
+        await db.execute(delete(PaperPosition).where(PaperPosition.account_id == account.id))
+
+        if clear_history:
+            await db.execute(delete(PaperFill))
+            await db.execute(delete(PaperOrder).where(PaperOrder.account_id == account.id))
+
+        account.virtual_balance = float(initial_cash)
+
+        # Reset risk state baselines to match new virtual equity
+        risk_state.emergency_stop = False
+        risk_state.kill_switch_reason = None
+        risk_state.starting_daily_equity = float(initial_cash)
+        risk_state.current_daily_pnl = 0.0
+        risk_state.peak_equity = float(initial_cash)
+        risk_state.consecutive_losses = 0
+        risk_state.last_breach_reason = None
+
+        audit_event = PaperRiskEvent(
+            id=str(uuid.uuid4()),
+            account_id=account.id,
+            event_type="ACCOUNT_CAPITAL_RESET",
+            severity="INFO",
+            reason=f"Virtual paper account reset to ${initial_cash:,.2f} USDT (clear_history={clear_history})",
+            metadata_json={"initial_cash": initial_cash, "clear_history": clear_history},
+        )
+        db.add(audit_event)
+        await db.commit()
+
+        return await self.get_account_overview(db)
+

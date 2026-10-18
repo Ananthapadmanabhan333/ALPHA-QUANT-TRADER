@@ -58,3 +58,47 @@ class ExperimentResponseSchema(BaseModel):
 class ExperimentListResponse(BaseModel):
     count: int
     experiments: List[ExperimentResponseSchema]
+
+
+class LiveIndicatorsSchema(BaseModel):
+    close: float
+    sma_20: Optional[float] = None
+    sma_100: Optional[float] = None
+    ema_20: Optional[float] = None
+    trend_spread_bps: Optional[float] = None
+    zscore_60: Optional[float] = None
+    atr_14: Optional[float] = None
+    atr_bps: Optional[float] = None
+    volatility_20: Optional[float] = None
+    momentum_5: Optional[float] = None
+    momentum_15: Optional[float] = None
+    momentum_60: Optional[float] = None
+    volume_ratio_20: Optional[float] = None
+
+
+class LiveTradeSetupSchema(BaseModel):
+    strategy_id: str
+    strategy_name: str
+    side: str
+    signal_score: float
+    reason: str
+    entry_price: float
+    stop_loss: float
+    take_profit_1: float
+    take_profit_2: float
+    risk_reward_ratio: float
+    recommended_qty: float
+    recommended_notional_usd: float
+    relevant_features: Dict[str, Optional[float]]
+
+
+class LiveScannerResponseSchema(BaseModel):
+    symbol: str
+    interval: str
+    timestamp: datetime
+    regime: str
+    consensus_side: str
+    consensus_score: float
+    indicators: LiveIndicatorsSchema
+    setups: List[LiveTradeSetupSchema]
+

@@ -30,6 +30,7 @@ import {
   resumeEmergencyStop,
   fetchMarketStatus,
   fetchCandles,
+  resetPaperAccount,
 } from '../services/api';
 
 export const PortfolioPage: React.FC = () => {
@@ -143,6 +144,24 @@ export const PortfolioPage: React.FC = () => {
     }
   };
 
+  const handleResetCapital = async (targetCapital: number) => {
+    if (!window.confirm(`Reset simulated account to $${targetCapital.toLocaleString()} USDT and flatten open paper positions?`)) {
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      await resetPaperAccount(targetCapital, true);
+      setSuccessMsg(`Virtual account capital reset to $${targetCapital.toLocaleString()} USDT.`);
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reset paper account.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleCancelOrder = async (orderId: string) => {
     try {
       await cancelPaperOrder(orderId);
@@ -181,7 +200,7 @@ export const PortfolioPage: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-alpha-border">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-alpha-text-primary flex items-center gap-3">
             <Briefcase className="w-6 h-6 text-alpha-gold" />
@@ -191,7 +210,23 @@ export const PortfolioPage: React.FC = () => {
             Simulated Spot Inventory, Pre-Trade Risk Gate, Ledger Invariants & Automated Emergency Halt
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 bg-alpha-surface border border-alpha-border rounded-lg p-1 mr-1">
+            <span className="text-[10px] font-mono text-alpha-text-muted px-2 uppercase">Set Capital:</span>
+            {[10000, 25000, 50000, 100000].map((cap) => (
+              <button
+                key={cap}
+                type="button"
+                disabled={isSubmitting}
+                onClick={() => handleResetCapital(cap)}
+                className="px-2 py-1 text-[11px] font-mono font-semibold rounded bg-alpha-card hover:bg-alpha-gold/20 text-alpha-text-secondary hover:text-alpha-gold border border-alpha-borderSubtle transition-colors"
+                title={`Reset virtual equity to $${cap.toLocaleString()} USDT`}
+              >
+                ${cap / 1000}k
+              </button>
+            ))}
+          </div>
+
           {risk?.emergency_stop ? (
             <button
               onClick={() => setShowResumeModal(true)}

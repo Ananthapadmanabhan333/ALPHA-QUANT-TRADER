@@ -263,8 +263,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
 
-    @app.get("/", tags=["System"], summary="Root Information")
-    async def root_info() -> dict:
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend_assets")
+
+    @app.get("/", tags=["System"], summary="Root Information or Trader Web UI")
+    async def root_info(request: Request):
+        accept_header = request.headers.get("accept", "")
+        index_file = frontend_dist / "index.html"
+        if (
+            settings.ENVIRONMENT != "testing"
+            and "text/html" in accept_header
+            and index_file.is_file()
+        ):
+            return FileResponse(str(index_file))
         return {
             "name": settings.PROJECT_NAME,
             "version": settings.VERSION,
@@ -273,8 +290,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "api_v1": settings.API_V1_STR,
         }
 
+    # Serve static files in frontend/dist (e.g. alpha-logo.svg) and SPA navigation routes
+    spa_routes = [
+        "/markets",
+        "/strategies",
+        "/backtesting",
+        "/paper-trading",
+        "/portfolio",
+        "/risk",
+        "/experiments",
+        "/system-health",
+        "/alpha-logo.svg",
+    ]
+    for route_path in spa_routes:
+        @app.get(route_path, include_in_schema=False)
+        async def serve_spa_route(request: Request):
+            req_file = frontend_dist / request.url.path.lstrip("/")
+            if req_file.is_file():
+                return FileResponse(str(req_file))
+            index_file = frontend_dist / "index.html"
+            if index_file.is_file():
+                return FileResponse(str(index_file))
+            return {"status": "frontend_not_built"}
+
     return app
 
 
 # Default app instance for ASGI runners (uvicorn)
 app = create_app()
+

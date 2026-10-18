@@ -15,6 +15,9 @@ import {
   Database,
   Radio,
   Server,
+  Target,
+  Crosshair,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   fetchCandles,
@@ -26,6 +29,8 @@ import {
   fetchHealth,
   fetchReadiness,
   fetchExperiments,
+  fetchLiveScanner,
+  submitPaperOrder,
 } from '../services/api';
 import {
   MarketCandle,
@@ -37,6 +42,8 @@ import {
   HealthResponse,
   ReadinessResponse,
   StrategySignal,
+  LiveScannerResponse,
+  LiveTradeSetup,
 } from '../types';
 import { HealthBadge } from '../components/common/HealthBadge';
 import { EmptyState } from '../components/common/EmptyState';
@@ -51,6 +58,10 @@ export const OverviewPage: React.FC = () => {
   const [recentSignals, setRecentSignals] = useState<StrategySignal[]>([]);
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [readiness, setReadiness] = useState<ReadinessResponse | null>(null);
+  const [liveScanner, setLiveScanner] = useState<LiveScannerResponse | null>(null);
+  const [scannerInterval, setScannerInterval] = useState<string>('1m');
+  const [executingSetupId, setExecutingSetupId] = useState<string | null>(null);
+  const [executionNotice, setExecutionNotice] = useState<string | null>(null);
 
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +80,7 @@ export const OverviewPage: React.FC = () => {
         healthRes,
         readyRes,
         experimentsRes,
+        scannerRes,
       ] = await Promise.all([
         fetchCandles('BTCUSDT', '1m', 20, false).catch(() => ({ candles: [] as MarketCandle[] })),
         fetchMarketStatus('BTCUSDT', '1m').catch(() => null),
@@ -79,6 +91,7 @@ export const OverviewPage: React.FC = () => {
         fetchHealth().catch(() => null),
         fetchReadiness().catch(() => null),
         fetchExperiments(undefined, 'BTCUSDT', 1).catch(() => ({ experiments: [] })),
+        fetchLiveScanner('BTCUSDT', scannerInterval, 10000.0).catch(() => null),
       ]);
 
       if (candlesRes && 'candles' in candlesRes) {
@@ -93,6 +106,9 @@ export const OverviewPage: React.FC = () => {
       }
       setHealth(healthRes);
       setReadiness(readyRes);
+      if (scannerRes) {
+        setLiveScanner(scannerRes);
+      }
 
       // Extract recent signals if present
       if (experimentsRes?.experiments?.[0]?.signals) {
@@ -106,7 +122,30 @@ export const OverviewPage: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [scannerInterval]);
+
+  const handleExecuteSetup = async (setup: LiveTradeSetup, overrideSide?: 'buy' | 'sell') => {
+    const sideToRun = overrideSide || (setup.side === 'sell' ? 'sell' : 'buy');
+    setExecutingSetupId(setup.strategy_id);
+    setExecutionNotice(null);
+    setError(null);
+    try {
+      const order = await submitPaperOrder({
+        symbol: 'BTCUSDT',
+        side: sideToRun,
+        order_type: 'market',
+        quantity: setup.recommended_qty,
+      });
+      setExecutionNotice(
+        `Executed ${sideToRun.toUpperCase()} ${order.filled_quantity} BTC @ $${(order.avg_fill_price ?? setup.entry_price).toLocaleString()} [${setup.strategy_name} | SL: $${setup.stop_loss.toLocaleString()} | TP1: $${setup.take_profit_1.toLocaleString()}]`
+      );
+      await loadOverviewData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to execute trade setup.');
+    } finally {
+      setExecutingSetupId(null);
+    }
+  };
 
   useEffect(() => {
     loadOverviewData();
@@ -316,6 +355,231 @@ export const OverviewPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Execution Confirmation Notice */}
+      {executionNotice && (
+        <div className="p-4 rounded-xl border border-emerald-500/40 bg-emerald-950/30 flex items-center justify-between text-emerald-300 text-xs font-mono">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{executionNotice}</span>
+          </div>
+          <button
+            onClick={() => setExecutionNotice(null)}
+            className="text-[11px] text-emerald-400 hover:underline ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* LIVE MULTI-STRATEGY QUANTITATIVE TRADE SETUPS & ATR SCANNER */}
+      {liveScanner && (
+        <div className="rounded-xl border border-alpha-gold/40 bg-alpha-card/95 p-5 shadow-lg space-y-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-alpha-borderSubtle">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-alpha-gold/15 border border-alpha-gold/40 text-alpha-gold">
+                <Target className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-white">
+                    Live Quantitative Trade Setups & ATR Risk Levels
+                  </h2>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                      liveScanner.consensus_side === 'BUY'
+                        ? 'bg-emerald-950/60 text-emerald-400 border-emerald-700/60'
+                        : liveScanner.consensus_side === 'SELL'
+                        ? 'bg-rose-950/60 text-rose-400 border-rose-700/60'
+                        : 'bg-alpha-gold/15 text-alpha-gold border-alpha-gold/40'
+                    }`}
+                  >
+                    CONSENSUS: {liveScanner.consensus_side} ({(liveScanner.consensus_score * 100).toFixed(0)}%)
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-alpha-surface border border-alpha-border text-alpha-text-secondary">
+                    REGIME: {liveScanner.regime}
+                  </span>
+                </div>
+                <p className="text-[11px] font-mono text-alpha-text-muted mt-0.5">
+                  Real-time multi-strategy evaluation with 2.0x ATR Stop-Loss, 2.0x/3.5x ATR Profit Targets & Safe Equity Sizing
+                </p>
+              </div>
+            </div>
+
+            {/* Interval Selector & Indicator Strip */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-alpha-text-muted uppercase">Timeframe:</span>
+              {(['1m', '5m', '15m'] as const).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setScannerInterval(tf)}
+                  className={`px-2.5 py-1 rounded text-xs font-mono font-semibold border transition-colors ${
+                    scannerInterval === tf
+                      ? 'bg-alpha-gold text-black border-alpha-gold'
+                      : 'bg-alpha-surface text-alpha-text-secondary border-alpha-border hover:border-alpha-gold/40'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Live Technical Indicator Telemetry Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 pt-1">
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">SMA(20) / SMA(100)</span>
+              <span className="text-xs font-bold text-white">
+                ${liveScanner.indicators.sma_20?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '—'} / $
+                {liveScanner.indicators.sma_100?.toLocaleString(undefined, { maximumFractionDigits: 0 }) ?? '—'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">Z-SCORE (60)</span>
+              <span
+                className={`text-xs font-bold ${
+                  (liveScanner.indicators.zscore_60 ?? 0) <= -1.5
+                    ? 'text-emerald-400'
+                    : (liveScanner.indicators.zscore_60 ?? 0) >= 1.5
+                    ? 'text-rose-400'
+                    : 'text-white'
+                }`}
+              >
+                {liveScanner.indicators.zscore_60?.toFixed(2) ?? '0.00'} σ
+              </span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">ATR (14) VOLATILITY</span>
+              <span className="text-xs font-bold text-alpha-gold">
+                ${liveScanner.indicators.atr_14?.toFixed(2) ?? '—'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">MOMENTUM (15B)</span>
+              <span
+                className={`text-xs font-bold ${
+                  (liveScanner.indicators.momentum_15 ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {(liveScanner.indicators.momentum_15 ?? 0) >= 0 ? '+' : ''}
+                {((liveScanner.indicators.momentum_15 ?? 0) * 100).toFixed(3)}%
+              </span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">MOMENTUM (60B)</span>
+              <span
+                className={`text-xs font-bold ${
+                  (liveScanner.indicators.momentum_60 ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}
+              >
+                {(liveScanner.indicators.momentum_60 ?? 0) >= 0 ? '+' : ''}
+                {((liveScanner.indicators.momentum_60 ?? 0) * 100).toFixed(3)}%
+              </span>
+            </div>
+            <div className="p-2.5 rounded-lg bg-alpha-surface/80 border border-alpha-borderSubtle font-mono">
+              <span className="text-[10px] text-alpha-text-muted block">VOLUME RATIO (20B)</span>
+              <span className="text-xs font-bold text-white">
+                {liveScanner.indicators.volume_ratio_20?.toFixed(2) ?? '1.00'}x
+              </span>
+            </div>
+          </div>
+
+          {/* 3 Strategy Actionable Trade Setup Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-1">
+            {liveScanner.setups.map((setup) => {
+              const isBuy = setup.side === 'buy';
+              const isSell = setup.side === 'sell';
+              return (
+                <div
+                  key={setup.strategy_id}
+                  className={`rounded-xl border p-4 flex flex-col justify-between transition-all ${
+                    isBuy
+                      ? 'border-emerald-500/50 bg-emerald-950/15'
+                      : isSell
+                      ? 'border-rose-500/50 bg-rose-950/15'
+                      : 'border-alpha-border bg-alpha-surface/60'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-xs font-mono font-bold text-white uppercase tracking-wide">
+                        {setup.strategy_name}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
+                          isBuy
+                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            : isSell
+                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                            : 'bg-neutral-800 text-neutral-300 border-neutral-700'
+                        }`}
+                      >
+                        {setup.side.toUpperCase()} ({(setup.signal_score * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] font-mono text-alpha-text-secondary mb-3 line-clamp-2" title={setup.reason}>
+                      {setup.reason}
+                    </p>
+
+                    {/* Entry, Stop Loss, TP1, TP2 Grid */}
+                    <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-alpha-bg/80 border border-alpha-borderSubtle text-[11px] font-mono mb-3">
+                      <div>
+                        <span className="text-alpha-text-muted block text-[10px]">ENTRY PRICE</span>
+                        <span className="text-white font-bold">${setup.entry_price.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-rose-400/80 block text-[10px]">STOP LOSS (2x ATR)</span>
+                        <span className="text-rose-400 font-bold">${setup.stop_loss.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-emerald-400/80 block text-[10px]">TARGET 1 (1:1)</span>
+                        <span className="text-emerald-400 font-bold">${setup.take_profit_1.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-emerald-300/80 block text-[10px]">TARGET 2 ({setup.risk_reward_ratio}:1)</span>
+                        <span className="text-emerald-300 font-bold">${setup.take_profit_2.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Sizing & Expected Profit */}
+                    <div className="flex items-center justify-between text-[11px] font-mono text-alpha-text-muted mb-3 px-1">
+                      <span>
+                        Rec Size: <strong className="text-white">{setup.recommended_qty} BTC</strong> ($
+                        {setup.recommended_notional_usd.toFixed(0)})
+                      </span>
+                      <span>
+                        R:R <strong className="text-alpha-gold">1:{setup.risk_reward_ratio}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Paper Execution Buttons */}
+                  <div className="flex items-center gap-2 pt-2 border-t border-alpha-borderSubtle">
+                    <button
+                      onClick={() => handleExecuteSetup(setup, 'buy')}
+                      disabled={executingSetupId === setup.strategy_id || riskStatus?.emergency_stop}
+                      className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[11px] font-mono font-bold transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Crosshair className="w-3.5 h-3.5" />
+                      <span>{executingSetupId === setup.strategy_id ? 'Executing...' : `Paper BUY ${setup.recommended_qty}`}</span>
+                    </button>
+                    {btcPosition && btcPosition.quantity > 0 && (
+                      <button
+                        onClick={() => handleExecuteSetup(setup, 'sell')}
+                        disabled={executingSetupId === setup.strategy_id}
+                        className="py-1.5 px-2.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[11px] font-mono font-bold transition-colors disabled:opacity-50"
+                      >
+                        SELL
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Orchestrator & Live Status Bar */}
       <div className="p-4 rounded-xl border border-alpha-border bg-alpha-card flex flex-col md:flex-row md:items-center justify-between gap-4">

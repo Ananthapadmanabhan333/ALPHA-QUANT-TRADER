@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+import math
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +24,9 @@ from app.quant.features.pipeline import FeaturePipeline
 from app.quant.schemas import (
     ExperimentListResponse,
     ExperimentResponseSchema,
+    LiveIndicatorsSchema,
+    LiveScannerResponseSchema,
+    LiveTradeSetupSchema,
     RunStrategyRequest,
     SignalResponseSchema,
     StrategyInfoSchema,
@@ -259,3 +264,159 @@ async def get_experiment_details(
         created_at=experiment.created_at,
         signals=signals,
     )
+
+
+def _safe_float(val) -> Optional[float]:
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        return round(f, 6) if math.isfinite(f) else None
+    except (ValueError, TypeError):
+        return None
+
+
+@router.get(
+    "/live-scanner",
+    response_model=LiveScannerResponseSchema,
+    summary="Real-time multi-strategy signal scanner and ATR trade setup generator",
+)
+async def get_live_strategy_scanner(
+    symbol: str = Query("BTCUSDT", description="Trading pair symbol"),
+    interval: str = Query("1m", description="Candle interval: 1m, 5m, 15m"),
+    account_equity: float = Query(10000.0, ge=100.0, description="Reference portfolio equity for sizing"),
+    db: AsyncSession = Depends(get_db),
+) -> LiveScannerResponseSchema:
+    """
+    Evaluates all baseline quantitative strategies on the latest market candles,
+    computes real-time technical indicators, and generates actionable ATR-calibrated
+    entry, stop-loss, take-profit, and position sizing setups for traders.
+    """
+    candles = await market_service.get_candles(
+        db=db,
+        symbol=symbol,
+        interval=interval,
+        limit=160,
+        only_closed=True,
+    )
+    if not candles or len(candles) < 30:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Insufficient finalized candles ({len(candles) if candles else 0}) for live scanner on {symbol} ({interval}).",
+        )
+
+    features_df = pipeline.compute_features(candles, interval=interval)
+    last_row = features_df.iloc[-1]
+
+    close_price = float(last_row["close"])
+    sma_20 = _safe_float(last_row.get("sma_20"))
+    sma_100 = _safe_float(last_row.get("sma_100"))
+    ema_20 = _safe_float(last_row.get("ema_20"))
+    zscore_60 = _safe_float(last_row.get("zscore_60"))
+    atr_14 = _safe_float(last_row.get("atr_14"))
+    vol_20 = _safe_float(last_row.get("volatility_20"))
+    mom_5 = _safe_float(last_row.get("momentum_5"))
+    mom_15 = _safe_float(last_row.get("momentum_15"))
+    mom_60 = _safe_float(last_row.get("momentum_60"))
+    vol_ratio_20 = _safe_float(last_row.get("volume_ratio_20"))
+
+    trend_spread_bps = None
+    if sma_20 is not None and sma_100 is not None and sma_100 > 0:
+        trend_spread_bps = round(((sma_20 - sma_100) / sma_100) * 10000.0, 2)
+
+    eff_atr = atr_14 if (atr_14 is not None and atr_14 > 0) else (close_price * 0.0015)
+    atr_bps = round((eff_atr / close_price) * 10000.0, 2) if close_price > 0 else 0.0
+
+    # Determine Market Regime
+    regime = "MEAN-REVERTING RANGE"
+    if vol_20 is not None and vol_20 > 0.0035:
+        regime = "HIGH VOLATILITY EXPANSION"
+    elif trend_spread_bps is not None:
+        if trend_spread_bps > 12.0:
+            regime = "BULLISH UPTREND"
+        elif trend_spread_bps < -12.0:
+            regime = "BEARISH DOWNTREND"
+
+    strategy_defs = [
+        (STRATEGY_TREND_FOLLOWING, "Trend Following (Dual SMA + Vol Filter)"),
+        (STRATEGY_MEAN_REVERSION, "Mean Reversion (60-Bar Z-Score Extremity)"),
+        (STRATEGY_MOMENTUM, "Volatility-Normalized Multi-Period Momentum"),
+    ]
+
+    # Safe 9.0% equity allocation per setup (respects 10% Central Risk Gate cap)
+    rec_notional = round(account_equity * 0.09, 2)
+    rec_qty = round(rec_notional / close_price, 4) if close_price > 0 else 0.001
+
+    setups: List[LiveTradeSetupSchema] = []
+    total_score = 0.0
+
+    for strat_id, strat_name in strategy_defs:
+        strat_instance = experiment_service.create_strategy_instance(strat_id)
+        signals = strat_instance.generate_signals(features_df)
+        latest_sig = signals[-1]
+        side_str = latest_sig.side.value if hasattr(latest_sig.side, "value") else str(latest_sig.side)
+        score = round(float(latest_sig.signal_score), 4) if math.isfinite(latest_sig.signal_score) else 0.0
+        total_score += score
+
+        if side_str == "sell":
+            stop_loss = round(close_price + 2.0 * eff_atr, 2)
+            tp1 = round(close_price - 2.0 * eff_atr, 2)
+            tp2 = round(close_price - 3.5 * eff_atr, 2)
+        else:
+            stop_loss = round(close_price - 2.0 * eff_atr, 2)
+            tp1 = round(close_price + 2.0 * eff_atr, 2)
+            tp2 = round(close_price + 3.5 * eff_atr, 2)
+
+        clean_features = {k: _safe_float(v) for k, v in (latest_sig.relevant_features or {}).items()}
+
+        setups.append(
+            LiveTradeSetupSchema(
+                strategy_id=strat_id,
+                strategy_name=strat_name,
+                side=side_str,
+                signal_score=score,
+                reason=latest_sig.reason,
+                entry_price=round(close_price, 2),
+                stop_loss=stop_loss,
+                take_profit_1=tp1,
+                take_profit_2=tp2,
+                risk_reward_ratio=1.75,
+                recommended_qty=rec_qty,
+                recommended_notional_usd=round(rec_qty * close_price, 2),
+                relevant_features=clean_features,
+            )
+        )
+
+    avg_score = round(total_score / len(strategy_defs), 4)
+    if avg_score >= 0.25:
+        consensus_side = "BUY"
+    elif avg_score <= -0.25:
+        consensus_side = "SELL"
+    else:
+        consensus_side = "HOLD"
+
+    return LiveScannerResponseSchema(
+        symbol=symbol,
+        interval=interval,
+        timestamp=datetime.now(timezone.utc),
+        regime=regime,
+        consensus_side=consensus_side,
+        consensus_score=avg_score,
+        indicators=LiveIndicatorsSchema(
+            close=round(close_price, 2),
+            sma_20=round(sma_20, 2) if sma_20 is not None else None,
+            sma_100=round(sma_100, 2) if sma_100 is not None else None,
+            ema_20=round(ema_20, 2) if ema_20 is not None else None,
+            trend_spread_bps=trend_spread_bps,
+            zscore_60=round(zscore_60, 3) if zscore_60 is not None else None,
+            atr_14=round(eff_atr, 2),
+            atr_bps=atr_bps,
+            volatility_20=round(vol_20, 6) if vol_20 is not None else None,
+            momentum_5=round(mom_5, 5) if mom_5 is not None else None,
+            momentum_15=round(mom_15, 5) if mom_15 is not None else None,
+            momentum_60=round(mom_60, 5) if mom_60 is not None else None,
+            volume_ratio_20=round(vol_ratio_20, 2) if vol_ratio_20 is not None else None,
+        ),
+        setups=setups,
+    )
+

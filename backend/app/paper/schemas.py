@@ -130,3 +130,9 @@ class MarketPriceUpdateRequest(BaseModel):
     low: Optional[float] = None
     volume: Optional[float] = None
     timestamp: Optional[datetime] = None
+
+
+class PaperAccountResetRequest(BaseModel):
+    initial_cash: float = Field(default=10000.0, ge=100.0, le=10000000.0, description="New virtual USDT starting capital")
+    clear_history: bool = Field(default=True, description="Clear historical paper orders and fills")
+

@@ -449,4 +449,49 @@ export interface AsyncTaskResponse {
   result?: Record<string, unknown> | null;
 }
 
+export interface LiveIndicators {
+  close: number;
+  sma_20?: number | null;
+  sma_100?: number | null;
+  ema_20?: number | null;
+  trend_spread_bps?: number | null;
+  zscore_60?: number | null;
+  atr_14?: number | null;
+  atr_bps?: number | null;
+  volatility_20?: number | null;
+  momentum_5?: number | null;
+  momentum_15?: number | null;
+  momentum_60?: number | null;
+  volume_ratio_20?: number | null;
+}
+
+export interface LiveTradeSetup {
+  strategy_id: string;
+  strategy_name: string;
+  side: 'buy' | 'sell' | 'hold' | string;
+  signal_score: number;
+  reason: string;
+  entry_price: number;
+  stop_loss: number;
+  take_profit_1: number;
+  take_profit_2: number;
+  risk_reward_ratio: number;
+  recommended_qty: number;
+  recommended_notional_usd: number;
+  relevant_features?: Record<string, unknown>;
+}
+
+export interface LiveScannerResponse {
+  symbol: string;
+  interval: string;
+  timestamp: string;
+  regime: string;
+  consensus_side: string;
+  consensus_score: number;
+  indicators: LiveIndicators;
+  setups: LiveTradeSetup[];
+}
+
+
+
 

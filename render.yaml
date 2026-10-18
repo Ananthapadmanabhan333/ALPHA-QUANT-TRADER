@@ -1,0 +1,27 @@
+services:
+  # 1. ALPHA Quant Unified Production Service (FastAPI Backend + Compiled React Trader Desk)
+  - type: web
+    name: alpha-quant-trader-desk
+    runtime: python
+    buildCommand: |
+      cd frontend && npm install && npm run build
+      cd ../backend && pip install -e .
+    startCommand: |
+      cd backend && alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: ENVIRONMENT
+        value: development
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./alpha_quant.db
+      - key: ENABLE_LIVE_FEED_STREAMING
+        value: "true"
+      - key: ADMIN_API_KEY
+        value: alpha-admin-dev-key
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: NODE_VERSION
+        value: "20.12.2"

@@ -25,6 +25,7 @@ from app.paper.schemas import (
     EmergencyResumeRequest,
     EmergencyStopRequest,
     MarketPriceUpdateRequest,
+    PaperAccountResetRequest,
     PaperAccountResponse,
     PaperFillResponse,
     PaperOrderCreateRequest,
@@ -54,6 +55,31 @@ async def get_paper_account(
         return await paper_service.get_account_overview(db, symbol=symbol)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.post(
+    "/account/reset",
+    response_model=PaperAccountResponse,
+    summary="Reset simulated paper account capital and positions",
+)
+async def reset_paper_account(
+    payload: PaperAccountResetRequest,
+    db: AsyncSession = Depends(get_db),
+    _auth: dict = Depends(verify_admin_key),
+):
+    """
+    Resets the virtual paper account to a clean starting USDT capital (e.g. $10,000, $50,000, $100,000)
+    so a trader can start a fresh session or adjust virtual capital allocation.
+    """
+    try:
+        return await paper_service.reset_paper_account(
+            db=db,
+            initial_cash=payload.initial_cash,
+            clear_history=payload.clear_history,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
 
 
 @router.post(
