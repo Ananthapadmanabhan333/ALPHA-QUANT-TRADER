@@ -299,6 +299,40 @@ async def get_live_strategy_scanner(
         limit=160,
         only_closed=True,
     )
+
+    from app.core.config import get_settings
+    settings = get_settings()
+    if settings.ENVIRONMENT != "testing":
+        needs_sync = not candles or len(candles) < 60
+        if candles:
+            latest_open = candles[-1].open_time
+            if latest_open.tzinfo is None:
+                latest_open = latest_open.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - latest_open).total_seconds() > 90:
+                needs_sync = True
+        if needs_sync:
+            try:
+                fresh_klines = await market_service.rest_adapter.fetch_klines(
+                    symbol=symbol, interval=interval, limit=160
+                )
+                if fresh_klines:
+                    await market_service.save_candles(db, fresh_klines)
+                    from app.api.v1.endpoints.market import get_market_tracker
+                    tracker = get_market_tracker()
+                    await tracker.record_message_received(
+                        exchange_time=fresh_klines[-1]["close_time"],
+                        close_price=float(fresh_klines[-1]["close"]),
+                    )
+                    candles = await market_service.get_candles(
+                        db=db,
+                        symbol=symbol,
+                        interval=interval,
+                        limit=160,
+                        only_closed=True,
+                    )
+            except Exception:
+                pass
+
     if not candles or len(candles) < 30:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -71,6 +71,38 @@ async def get_candles(
         only_closed=only_closed,
     )
 
+    from app.core.config import get_settings
+    if get_settings().ENVIRONMENT != "testing" and start_time is None and end_time is None:
+        needs_sync = not candles
+        if candles:
+            latest_open = candles[-1].open_time
+            if latest_open.tzinfo is None:
+                latest_open = latest_open.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - latest_open).total_seconds() > 90:
+                needs_sync = True
+        if needs_sync:
+            try:
+                fresh_klines = await service.rest_adapter.fetch_klines(
+                    symbol=norm_symbol, interval=interval, limit=max(limit, 120)
+                )
+                if fresh_klines:
+                    await service.save_candles(db, fresh_klines)
+                    await _default_tracker.record_message_received(
+                        exchange_time=fresh_klines[-1]["close_time"],
+                        close_price=float(fresh_klines[-1]["close"]),
+                    )
+                    candles = await service.get_candles(
+                        db=db,
+                        symbol=norm_symbol,
+                        interval=interval,
+                        start_time=start_time,
+                        end_time=end_time,
+                        limit=limit,
+                        only_closed=only_closed,
+                    )
+            except Exception:
+                pass
+
     schema_candles = [CandleSchema.model_validate(c) for c in candles]
 
     return CandlesListResponse(
@@ -92,6 +124,7 @@ async def get_candles(
 async def get_market_status(
     symbol: str = Query(DEFAULT_SYMBOL, description="Trading pair symbol"),
     interval: str = Query(DEFAULT_INTERVAL, description="Interval to query status for"),
+    db: AsyncSession = Depends(get_db),
     service: MarketDataService = Depends(get_market_service),
     tracker: MarketFeedTracker = Depends(get_market_tracker),
 ) -> MarketStatusResponse:
@@ -101,6 +134,17 @@ async def get_market_status(
     """
     if interval not in SUPPORTED_INTERVALS:
         raise InvalidIntervalException(interval, SUPPORTED_INTERVALS)
+
+    from app.core.config import get_settings
+    if get_settings().ENVIRONMENT != "testing":
+        status_snap = await tracker.get_status(rate_limiter=service.rest_adapter.rate_limiter)
+        if status_snap.latest_close_price is None:
+            latest_candle = await service.get_latest_candle(db, normalize_symbol(symbol), interval, only_closed=False)
+            if latest_candle:
+                await tracker.record_message_received(
+                    exchange_time=latest_candle.exchange_event_time or latest_candle.open_time,
+                    close_price=float(latest_candle.close),
+                )
 
     return await tracker.get_status(rate_limiter=service.rest_adapter.rate_limiter)
 

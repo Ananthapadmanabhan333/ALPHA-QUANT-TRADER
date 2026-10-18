@@ -135,6 +135,10 @@ class BinanceRestAdapter:
 
         try:
             response = await client.get(url, params=params)
+            if response.status_code in (451, 403) and "binance.vision" not in self.base_url:
+                self.base_url = "https://data-api.binance.vision"
+                url = f"{self.base_url}/api/v3/klines"
+                response = await client.get(url, params=params)
         except (httpx.ConnectError, httpx.TimeoutException, httpx.NetworkError) as exc:
             logger.warning("binance_rest_connection_error", error=str(exc), url=url)
             raise ExchangeConnectionException(f"Network error communicating with Binance: {exc}")
@@ -248,6 +252,9 @@ class BinanceRestAdapter:
         try:
             client = await self._get_client()
             res = await client.get(f"{self.base_url}/api/v3/ping", timeout=4.0)
+            if res.status_code in (451, 403) and "binance.vision" not in self.base_url:
+                self.base_url = "https://data-api.binance.vision"
+                res = await client.get(f"{self.base_url}/api/v3/ping", timeout=4.0)
             latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
             if res.status_code == 200:
                 return {
