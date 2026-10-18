@@ -91,6 +91,7 @@ class Settings(BaseSettings):
     MARKET_DATA_RATE_LIMIT_PER_MINUTE: int = 1200
     MARKET_DATA_WS_INITIAL_BACKOFF_SECONDS: float = 1.0
     MARKET_DATA_WS_MAX_BACKOFF_SECONDS: float = 60.0
+    ENABLE_LIVE_FEED_STREAMING: bool = True
 
     # Security & Administration
     ADMIN_API_KEY: str = "alpha-quant-admin-secret"

@@ -69,10 +69,81 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.debug("startup_risk_recovery_skipped", detail=str(exc))
 
+    # 4. Background Live Market Data Streaming (Binance Spot WebSocket)
+    ws_streamer = None
+    if getattr(settings, "ENABLE_LIVE_FEED_STREAMING", True) and settings.ENVIRONMENT != "testing":
+        try:
+            from app.api.v1.endpoints.market import get_market_service, get_market_tracker
+            from app.db.session import get_session_factory
+            from app.market.ws_adapter import BinanceWsAdapter
+            from app.orchestration.broadcaster import get_broadcaster
+
+            tracker = get_market_tracker()
+            service = get_market_service()
+            broadcaster = get_broadcaster()
+            session_factory = get_session_factory()
+
+            # Pre-hydrate tracker and recover any recent gap since last run
+            async with session_factory() as init_session:
+                try:
+                    await service.execute_restart_recovery(init_session, settings.DEFAULT_SYMBOL, settings.DEFAULT_INTERVAL)
+                except Exception as rec_err:
+                    logger.debug("startup_gap_recovery_skipped", detail=str(rec_err))
+
+                latest_candle = await service.get_latest_candle(init_session, settings.DEFAULT_SYMBOL, settings.DEFAULT_INTERVAL, only_closed=False)
+                if latest_candle:
+                    await tracker.record_message_received(
+                        exchange_time=latest_candle.exchange_event_time or latest_candle.open_time,
+                        close_price=float(latest_candle.close),
+                    )
+
+            async def on_live_candle(candle: dict):
+                try:
+                    async with session_factory() as live_session:
+                        await service.save_candles(live_session, [candle])
+                except Exception as persist_err:
+                    logger.warning("live_ws_candle_persist_failed", error=str(persist_err))
+
+                await broadcaster.broadcast(
+                    "MARKET_TICK",
+                    {
+                        "symbol": candle["symbol"],
+                        "interval": candle["interval"],
+                        "close": candle["close"],
+                        "high": candle["high"],
+                        "low": candle["low"],
+                        "volume": candle["volume"],
+                        "open_time": candle["open_time"].isoformat(),
+                        "is_closed": candle["is_closed"],
+                    },
+                )
+
+            ws_streamer = BinanceWsAdapter(
+                symbol=settings.DEFAULT_SYMBOL,
+                interval=settings.DEFAULT_INTERVAL,
+                on_candle=on_live_candle,
+                tracker=tracker,
+            )
+            ws_streamer.start()
+            logger.info(
+                "live_market_data_streamer_started",
+                symbol=settings.DEFAULT_SYMBOL,
+                interval=settings.DEFAULT_INTERVAL,
+            )
+        except Exception as exc:
+            logger.warning("live_market_data_streamer_failed_to_start", error=str(exc))
+
     yield
 
     # Graceful shutdown:
     logger.info("alpha_quant_graceful_shutdown_starting")
+
+    # Stop background market data streamer
+    if ws_streamer is not None:
+        try:
+            await ws_streamer.stop()
+        except Exception as exc:
+            logger.debug("graceful_shutdown_ws_streamer_cleanup", detail=str(exc))
 
     # Stop paper trading orchestrator if running
     try:

@@ -28,6 +28,8 @@ import {
   fetchRiskStatus,
   triggerEmergencyStop,
   resumeEmergencyStop,
+  fetchMarketStatus,
+  fetchCandles,
 } from '../services/api';
 
 export const PortfolioPage: React.FC = () => {
@@ -36,6 +38,7 @@ export const PortfolioPage: React.FC = () => {
   const [fills, setFills] = useState<PaperFill[]>([]);
   const [activeLedgerTab, setActiveLedgerTab] = useState<'orders' | 'fills'>('orders');
   const [risk, setRisk] = useState<RiskStatus | null>(null);
+  const [livePrice, setLivePrice] = useState<number>(81300);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,8 @@ export const PortfolioPage: React.FC = () => {
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
   const [symbol] = useState<string>('BTCUSDT');
   const [quantity, setQuantity] = useState<number>(0.01);
-  const [price, setPrice] = useState<number>(50000);
+  const [price, setPrice] = useState<number>(81300);
+  const [priceInitialized, setPriceInitialized] = useState<boolean>(false);
 
   // Resume modal state
   const [showResumeModal, setShowResumeModal] = useState<boolean>(false);
@@ -54,18 +58,32 @@ export const PortfolioPage: React.FC = () => {
 
   const loadData = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      const [acc, orderList, fillsList, riskStat] = await Promise.all([
+      const [acc, orderList, fillsList, riskStat, mktStat, candleRes] = await Promise.all([
         fetchPaperAccount().catch(() => null),
         fetchPaperOrders().catch(() => []),
         fetchFills().catch(() => ({ total: 0, limit: 50, offset: 0, items: [] })),
         fetchRiskStatus().catch(() => null),
+        fetchMarketStatus('BTCUSDT', '1m').catch(() => null),
+        fetchCandles('BTCUSDT', '1m', 1, false).catch(() => null),
       ]);
       setAccount(acc);
       setOrders(orderList);
       setFills(fillsList.items || []);
       setRisk(riskStat);
+
+      const detectedPrice =
+        mktStat?.latest_close_price ||
+        candleRes?.candles?.[candleRes.candles.length - 1]?.close ||
+        acc?.positions?.[0]?.current_price;
+
+      if (detectedPrice && detectedPrice > 0) {
+        setLivePrice(detectedPrice);
+        if (!priceInitialized) {
+          setPrice(Math.round(detectedPrice));
+          setPriceInitialized(true);
+        }
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load paper broker data.');
     } finally {
@@ -75,6 +93,8 @@ export const PortfolioPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    const interval = window.setInterval(loadData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
@@ -93,10 +113,31 @@ export const PortfolioPage: React.FC = () => {
 
     try {
       const result = await submitPaperOrder(payload);
-      setSuccessMsg(`Simulated order submitted: ${result.side.toUpperCase()} ${result.quantity} ${result.symbol} [${result.status.toUpperCase()}]`);
+      setSuccessMsg(`Simulated order executed: ${result.side.toUpperCase()} ${result.quantity} ${result.symbol} [${result.status.toUpperCase()}]`);
       await loadData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Order submission failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFlattenPosition = async (posSymbol: string, posQuantity: number) => {
+    if (posQuantity <= 0) return;
+    setIsSubmitting(true);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const result = await submitPaperOrder({
+        symbol: posSymbol,
+        side: 'sell',
+        order_type: 'market',
+        quantity: posQuantity,
+      });
+      setSuccessMsg(`Flattened position: SOLD ${result.quantity} ${result.symbol} @ Market [${result.status.toUpperCase()}]`);
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to flatten position.');
     } finally {
       setIsSubmitting(false);
     }
@@ -336,10 +377,15 @@ export const PortfolioPage: React.FC = () => {
         {/* Left Column: Simulated Order Launcher */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-alpha-card border border-alpha-border rounded-xl p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-alpha-text-primary flex items-center gap-2 mb-4">
-              <Play className="w-4 h-4 text-alpha-gold" />
-              <span>Submit Simulated Order</span>
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-alpha-text-primary flex items-center gap-2">
+                <Play className="w-4 h-4 text-alpha-gold" />
+                <span>Submit Simulated Order</span>
+              </h2>
+              <span className="px-2 py-0.5 text-[11px] font-mono font-bold rounded bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/30">
+                BTC: ${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
 
             <form onSubmit={handleOrderSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -382,12 +428,51 @@ export const PortfolioPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-alpha-text-secondary mb-1">
-                  Quantity ({symbol.replace('USDT', '')})
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-alpha-text-secondary">
+                    Quantity ({symbol.replace('USDT', '')})
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {[0.002, 0.005, 0.01].map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => setQuantity(q)}
+                        className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                    {orderSide === 'buy' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const eq = account?.total_equity ?? 10000;
+                          const maxSafeNotional = eq * 0.095;
+                          const refP = orderType === 'limit' ? price : livePrice;
+                          if (refP > 0) setQuantity(Number((maxSafeNotional / refP).toFixed(4)));
+                        }}
+                        className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-gold/10 border border-alpha-gold/40 text-alpha-gold hover:bg-alpha-gold/20 transition-colors"
+                        title="Size to 9.5% of equity (within 10% risk gate concentration limit)"
+                      >
+                        Max Safe
+                      </button>
+                    ) : (
+                      account?.positions && account.positions.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setQuantity(Number((account.positions[0]?.quantity ?? 0).toFixed(4)))}
+                          className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 transition-colors"
+                        >
+                          100% Pos
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
                 <input
                   type="number"
-                  step="0.001"
+                  step="0.0001"
                   min="0.0001"
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
@@ -397,9 +482,29 @@ export const PortfolioPage: React.FC = () => {
 
               {orderType === 'limit' && (
                 <div>
-                  <label className="block text-xs font-semibold text-alpha-text-secondary mb-1">
-                    Limit Price ($ USD)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-alpha-text-secondary">
+                      Limit Price ($ USD)
+                    </label>
+                    <div className="flex items-center gap-1">
+                      {[
+                        { label: '-0.5%', mult: 0.995 },
+                        { label: '-0.1%', mult: 0.999 },
+                        { label: 'Mkt', mult: 1.0 },
+                        { label: '+0.1%', mult: 1.001 },
+                        { label: '+0.5%', mult: 1.005 },
+                      ].map((btn) => (
+                        <button
+                          key={btn.label}
+                          type="button"
+                          onClick={() => setPrice(Math.round(livePrice * btn.mult))}
+                          className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-alpha-surface border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold hover:border-alpha-gold/50 transition-colors"
+                        >
+                          {btn.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
                     type="number"
                     step="1"
@@ -411,24 +516,35 @@ export const PortfolioPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="p-3 bg-alpha-surface border border-alpha-border rounded-lg text-[11px] text-alpha-text-secondary space-y-1">
-                <div className="flex justify-between">
-                  <span>Estimated Notional:</span>
-                  <span className="font-mono text-alpha-text-primary font-semibold">
-                    ${(quantity * (orderType === 'limit' ? price : 50050)).toFixed(2)} USD
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Fee / Slippage Drag:</span>
-                  <span className="font-mono text-alpha-text-secondary">
-                    {orderType === 'market' ? '10 bps fee + 5 bps slip' : '8 bps maker fee'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Risk Concentration Cap:</span>
-                  <span className="font-mono text-alpha-gold">10.0% of virtual equity</span>
-                </div>
-              </div>
+              {(() => {
+                const refP = orderType === 'limit' ? price : livePrice;
+                const estNotional = quantity * refP;
+                const eq = account?.total_equity ?? 10000;
+                const pctOfEq = eq > 0 ? (estNotional / eq) * 100 : 0;
+                const isOverCap = orderSide === 'buy' && pctOfEq > (risk?.max_position_pct ?? 10);
+                return (
+                  <div className="p-3 bg-alpha-surface border border-alpha-border rounded-lg text-[11px] text-alpha-text-secondary space-y-1">
+                    <div className="flex justify-between">
+                      <span>Estimated Notional:</span>
+                      <span className={`font-mono font-semibold ${isOverCap ? 'text-rose-400' : 'text-alpha-text-primary'}`}>
+                        ${estNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD ({pctOfEq.toFixed(1)}% Eq)
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Fee / Slippage Drag:</span>
+                      <span className="font-mono text-alpha-text-secondary">
+                        {orderType === 'market' ? '10 bps fee + 5 bps slip' : '8 bps maker fee'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Risk Concentration Cap:</span>
+                      <span className={`font-mono ${isOverCap ? 'text-rose-400 font-bold' : 'text-alpha-gold'}`}>
+                        {(risk?.max_position_pct ?? 10).toFixed(1)}% of virtual equity (${((eq * (risk?.max_position_pct ?? 10)) / 100).toFixed(0)} max)
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <button
                 type="submit"
@@ -473,6 +589,7 @@ export const PortfolioPage: React.FC = () => {
                       <th className="text-right pb-2">Entry Price</th>
                       <th className="text-right pb-2">Market Val</th>
                       <th className="text-right pb-2">Unrealized P&L</th>
+                      <th className="text-right pb-2">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-alpha-border/40">
@@ -484,6 +601,16 @@ export const PortfolioPage: React.FC = () => {
                         <td className="py-2.5 text-right text-alpha-text-primary">${p.market_value.toFixed(2)}</td>
                         <td className={`py-2.5 text-right font-bold ${p.unrealized_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                           ${p.unrealized_pnl >= 0 ? '+' : ''}{p.unrealized_pnl.toFixed(2)} ({p.unrealized_pnl_pct.toFixed(2)}%)
+                        </td>
+                        <td className="py-2.5 text-right">
+                          <button
+                            type="button"
+                            disabled={isSubmitting || p.quantity <= 0}
+                            onClick={() => handleFlattenPosition(p.symbol, p.quantity)}
+                            className="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 transition-colors disabled:opacity-50"
+                          >
+                            Flatten
+                          </button>
                         </td>
                       </tr>
                     ))}

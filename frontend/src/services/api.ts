@@ -93,6 +93,25 @@ export async function fetchMarketStatus(
   return handleResponse<MarketStatusResponse>(res);
 }
 
+export async function triggerMarketBackfill(
+  symbol: string = 'BTCUSDT',
+  interval: string = '1m',
+  startTime: string,
+  endTime?: string,
+): Promise<{ candles_saved: number; status: string; duration_ms: number }> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/market/backfill`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      symbol,
+      interval,
+      start_time: startTime,
+      end_time: endTime,
+    }),
+  });
+  return handleResponse<{ candles_saved: number; status: string; duration_ms: number }>(res);
+}
+
 export async function fetchStrategies(): Promise<StrategyInfo[]> {
   const res = await fetch(`${API_BASE_URL}/api/v1/strategies`);
   return handleResponse<StrategyInfo[]>(res);

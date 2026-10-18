@@ -48,14 +48,13 @@ class PaperService:
         interval: str = "1m",
     ) -> Optional[MarketCandle]:
         """
-        Retrieves the most recent closed market candle from the database.
+        Retrieves the most recent market candle (including live streaming tick) from the database.
         """
         stmt = (
             select(MarketCandle)
             .where(
                 MarketCandle.symbol == symbol,
                 MarketCandle.interval == interval,
-                MarketCandle.is_closed.is_(True),
             )
             .order_by(MarketCandle.open_time.desc())
             .limit(1)

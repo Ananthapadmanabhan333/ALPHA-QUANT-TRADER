@@ -4,8 +4,9 @@ import {
   RefreshCw,
   Database,
   AlertTriangle,
+  Radio,
 } from 'lucide-react';
-import { fetchCandles, fetchMarketStatus, fetchExperiments } from '../services/api';
+import { fetchCandles, fetchMarketStatus, fetchExperiments, triggerMarketBackfill } from '../services/api';
 import { MarketCandle, MarketStatusResponse, StrategySignal } from '../types';
 import { EmptyState } from '../components/common/EmptyState';
 
@@ -32,6 +33,8 @@ export const MarketsPage: React.FC = () => {
   const [status, setStatus] = useState<MarketStatusResponse | null>(null);
   const [signals, setSignals] = useState<StrategySignal[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Overlay toggles
@@ -70,6 +73,23 @@ export const MarketsPage: React.FC = () => {
       setLoading(false);
     }
   }, [symbol, interval, limit]);
+
+  const handleSyncExchange = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    setError(null);
+    try {
+      const hoursBack = interval === '1m' ? 6 : interval === '5m' ? 24 : 72;
+      const start = new Date(Date.now() - hoursBack * 3600 * 1000).toISOString();
+      const res = await triggerMarketBackfill(symbol, interval, start);
+      setSyncMsg(`Synced ${res.candles_saved} ${interval} candles from Binance Spot (${res.duration_ms.toFixed(0)}ms)`);
+      await loadData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to sync from Binance exchange');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -176,6 +196,16 @@ export const MarketsPage: React.FC = () => {
           </select>
 
           <button
+            onClick={handleSyncExchange}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-alpha-gold/15 text-alpha-gold border border-alpha-gold/40 hover:bg-alpha-gold/25 transition-colors disabled:opacity-50"
+            title="Sync latest candles directly from Binance Spot REST API"
+          >
+            <Radio className={`w-3.5 h-3.5 ${syncing ? 'animate-pulse' : ''}`} />
+            <span>{syncing ? 'Syncing...' : 'Sync Exchange'}</span>
+          </button>
+
+          <button
             onClick={loadData}
             disabled={loading}
             className="p-2 rounded-lg bg-alpha-card border border-alpha-border text-alpha-text-secondary hover:text-alpha-gold transition-colors"
@@ -185,6 +215,14 @@ export const MarketsPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Sync Notification Banner */}
+      {syncMsg && (
+        <div className="p-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 flex items-center justify-between text-emerald-300 text-xs font-mono">
+          <span>✓ {syncMsg}</span>
+          <button onClick={() => setSyncMsg(null)} className="text-emerald-400 hover:text-white">✕</button>
+        </div>
+      )}
 
       {/* Warnings & Diagnostics Banner */}
       {(status?.is_stale || status?.feed_state === 'DISCONNECTED' || (status?.gap_count ?? 0) > 0) && (

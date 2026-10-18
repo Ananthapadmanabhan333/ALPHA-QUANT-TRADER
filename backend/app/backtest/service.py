@@ -114,7 +114,7 @@ class BacktestService:
             net_return_pct=result.performance.net_return_pct,
             sharpe_ratio=result.performance.sharpe_ratio,
             max_drawdown_pct=result.performance.max_drawdown_pct,
-            profit_factor=result.performance.profit_factor,
+            profit_factor=round(result.performance.profit_factor, 4) if np.isfinite(result.performance.profit_factor) else None,
             win_rate_pct=result.performance.win_rate_pct,
             created_at=datetime.now(timezone.utc),
             completed_at=datetime.now(timezone.utc),

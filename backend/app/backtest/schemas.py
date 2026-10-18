@@ -1,6 +1,7 @@
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BacktestCreateRequest(BaseModel):
@@ -72,6 +73,41 @@ class BacktestRunResponse(BaseModel):
     trades: Optional[List[TradeResponseSchema]] = None
     regime_performance: Optional[Dict[str, Any]] = None
     stress_test_results: Optional[Dict[str, Any]] = None
+
+    @field_validator("profit_factor", mode="before")
+    @classmethod
+    def sanitize_profit_factor(cls, v: Any) -> Optional[float]:
+        if v is None:
+            return None
+        try:
+            val = float(v)
+            return round(val, 4) if math.isfinite(val) else None
+        except (ValueError, TypeError):
+            return None
+
+    @field_validator("sharpe_ratio", "net_return_pct", "max_drawdown_pct", "win_rate_pct", mode="before")
+    @classmethod
+    def sanitize_floats(cls, v: Any) -> float:
+        if v is None:
+            return 0.0
+        try:
+            val = float(v)
+            return round(val, 4) if math.isfinite(val) else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    @field_validator("metrics", mode="before")
+    @classmethod
+    def sanitize_metrics(cls, v: Any) -> Dict[str, Any]:
+        if isinstance(v, dict):
+            clean = {}
+            for k, val in v.items():
+                if isinstance(val, float) and not math.isfinite(val):
+                    clean[k] = None
+                else:
+                    clean[k] = val
+            return clean
+        return v or {}
 
 
 class BacktestListResponse(BaseModel):
